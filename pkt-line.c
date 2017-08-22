@@ -194,7 +194,7 @@ int packet_write_fmt_gently(int fd, const char *fmt, ...)
 	return status;
 }
 
-static int packet_write_gently(const int fd_out, const char *buf, size_t size)
+int packet_write_gently(const int fd_out, const char *buf, size_t size)
 {
 	char header[4];
 	size_t packet_size;
