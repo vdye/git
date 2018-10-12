@@ -12,7 +12,6 @@
 #include "packfile.h"
 #include "object-store.h"
 #include "lockfile.h"
-#include "exec-cmd.h"
 
 static int get_st_mode_bits(const char *path, int *mode)
 {
@@ -735,10 +734,6 @@ char *interpolate_path(const char *path, int real_home)
 
 	if (path == NULL)
 		goto return_null;
-
-	if (skip_prefix(path, "%(prefix)/", &path))
-		return system_path(path);
-
 	if (path[0] == '~') {
 		const char *first_slash = strchrnul(path, '/');
 		const char *username = path + 1;
