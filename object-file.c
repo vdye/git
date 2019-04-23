@@ -36,6 +36,7 @@
 #include "submodule.h"
 #include "fsck.h"
 #include "trace.h"
+#include "trace2.h"
 #include "hook.h"
 #include "sigchain.h"
 #include "sub-process.h"
@@ -991,6 +992,8 @@ static int read_object_process(const struct object_id *oid)
 
 	start = getnanotime();
 
+	trace2_region_enter("subprocess", "read_object", the_repository);
+
 	if (!subprocess_map_initialized) {
 		subprocess_map_initialized = 1;
 		hashmap_init(&subprocess_map, (hashmap_cmp_fn)cmd2process_cmp,
@@ -1007,13 +1010,16 @@ static int read_object_process(const struct object_id *oid)
 		if (subprocess_start(&subprocess_map, &entry->subprocess, cmd,
 				     start_read_object_fn)) {
 			free(entry);
-			return -1;
+			err = -1;
+			goto leave_region;
 		}
 	}
 	process = &entry->subprocess.process;
 
-	if (!(CAP_GET & entry->supported_capabilities))
-		return -1;
+	if (!(CAP_GET & entry->supported_capabilities)) {
+		err = -1;
+		goto leave_region;
+	}
 
 	sigchain_push(SIGPIPE, SIG_IGN);
 
@@ -1061,6 +1067,10 @@ done:
 	}
 
 	trace_performance_since(start, "read_object_process");
+
+leave_region:
+	trace2_region_leave_printf("subprocess", "read_object", the_repository,
+				   "result %d", err);
 
 	return err;
 }
