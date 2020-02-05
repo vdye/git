@@ -570,5 +570,6 @@ test_expect_success MINGW 'MSYSTEM/PATH is adjusted if necessary' '
 	test_write_lines MSYSTEM=$MSYSTEM mingw64 usr >expect &&
 	test_cmp expect actual
 '
+'
 
 test_done
