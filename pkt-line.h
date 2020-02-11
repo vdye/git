@@ -42,8 +42,10 @@ int packet_write_fmt_gently(int fd, const char *fmt, ...) __attribute__((format 
 int packet_write_gently(const int fd_out, const char *buf, size_t size,
 			struct packet_scratch_space *scratch);
 int write_packetized_from_fd(int fd_in, int fd_out);
-int write_packetized_from_buf(const char *src_in, size_t len, int fd_out);
+int write_packetized_from_buf(const char *src_in, size_t len, int fd_out,
+			      int flush_at_end);
 int write_packetized_from_buf2(const char *src_in, size_t len, int fd_out,
+			       int flush_at_end,
 			       struct packet_scratch_space *scratch);
 
 /*
