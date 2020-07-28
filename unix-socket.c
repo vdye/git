@@ -88,24 +88,35 @@ fail:
 	return -1;
 }
 
-int unix_stream_listen(const char *path)
+int unix_stream_listen(const char *path,
+		       const struct unix_stream_listen_opts *opts)
 {
-	int fd, saved_errno;
+	int fd = -1;
+	int saved_errno;
+	int bind_successful = 0;
+	int backlog;
 	struct sockaddr_un sa;
 	struct unix_sockaddr_context ctx;
 
-	unlink(path);
-
 	if (unix_sockaddr_init(&sa, path, &ctx) < 0)
 		return -1;
+
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
-		die_errno("unable to create socket");
+		goto fail;
+
+	if (opts->force_unlink_before_bind)
+		unlink(path);
 
 	if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0)
 		goto fail;
+	bind_successful = 1;
 
-	if (listen(fd, 5) < 0)
+	if (opts->listen_backlog_size > 0)
+		backlog = opts->listen_backlog_size;
+	else
+		backlog = 5;
+	if (listen(fd, backlog) < 0)
 		goto fail;
 
 	unix_sockaddr_cleanup(&ctx);
@@ -114,7 +125,10 @@ int unix_stream_listen(const char *path)
 fail:
 	saved_errno = errno;
 	unix_sockaddr_cleanup(&ctx);
-	close(fd);
+	if (fd != -1)
+		close(fd);
+	if (bind_successful)
+		unlink(path);
 	errno = saved_errno;
 	return -1;
 }
