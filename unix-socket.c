@@ -11,7 +11,14 @@ static int chdir_len(const char *orig, int len)
 
 struct unix_sockaddr_context {
 	char *orig_dir;
+	unsigned int disallow_chdir:1;
 };
+
+#define UNIX_SOCKADDR_CONTEXT_INIT \
+{ \
+	.orig_dir=NULL, \
+	.disallow_chdir=0, \
+}
 
 static void unix_sockaddr_cleanup(struct unix_sockaddr_context *ctx)
 {
@@ -32,7 +39,11 @@ static int unix_sockaddr_init(struct sockaddr_un *sa, const char *path,
 {
 	int size = strlen(path) + 1;
 
-	ctx->orig_dir = NULL;
+	if (ctx->disallow_chdir && size > sizeof(sa->sun_path)) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
 	if (size > sizeof(sa->sun_path)) {
 		const char *slash = find_last_dir_sep(path);
 		const char *dir;
@@ -67,7 +78,7 @@ int unix_stream_connect(const char *path)
 {
 	int fd, saved_errno;
 	struct sockaddr_un sa;
-	struct unix_sockaddr_context ctx;
+	struct unix_sockaddr_context ctx = UNIX_SOCKADDR_CONTEXT_INIT;
 
 	if (unix_sockaddr_init(&sa, path, &ctx) < 0)
 		return -1;
@@ -96,7 +107,9 @@ int unix_stream_listen(const char *path,
 	int bind_successful = 0;
 	int backlog;
 	struct sockaddr_un sa;
-	struct unix_sockaddr_context ctx;
+	struct unix_sockaddr_context ctx = UNIX_SOCKADDR_CONTEXT_INIT;
+
+	ctx.disallow_chdir = opts->disallow_chdir;
 
 	if (unix_sockaddr_init(&sa, path, &ctx) < 0)
 		return -1;
