@@ -475,11 +475,12 @@ test_expect_success 'stop preserves surrounding schedule' '
 	grep "Crucial information!" cron.txt
 '
 
-test_expect_success !MINGW 'start and stop macOS maintenance' '
-	uid=$(id -u) &&
+test_expect_success 'start and stop macOS maintenance' '
+	# ensure $HOME can be compared against hook arguments on all platforms
+	pfx=$(cd "$HOME" && pwd) &&
 
 	write_script print-args <<-\EOF &&
-	echo $* >>args
+	echo $* | sed "s:gui/[0-9][0-9]*:gui/[UID]:" >>args
 	EOF
 
 	rm -f args &&
@@ -499,11 +500,11 @@ test_expect_success !MINGW 'start and stop macOS maintenance' '
 	rm -f expect &&
 	for frequency in hourly daily weekly
 	do
-		PLIST="$HOME/Library/LaunchAgents/org.git-scm.git.$frequency.plist" &&
+		PLIST="$pfx/Library/LaunchAgents/org.git-scm.git.$frequency.plist" &&
 		test_xmllint "$PLIST" &&
 		grep schedule=$frequency "$PLIST" &&
-		echo "bootout gui/$uid $PLIST" >>expect &&
-		echo "bootstrap gui/$uid $PLIST" >>expect || return 1
+		echo "bootout gui/[UID] $PLIST" >>expect &&
+		echo "bootstrap gui/[UID] $PLIST" >>expect || return 1
 	done &&
 	test_cmp expect args &&
 
@@ -513,7 +514,7 @@ test_expect_success !MINGW 'start and stop macOS maintenance' '
 	# stop does not unregister the repo
 	git config --get --global maintenance.repo "$(pwd)" &&
 
-	printf "bootout gui/$uid $HOME/Library/LaunchAgents/org.git-scm.git.%s.plist\n" \
+	printf "bootout gui/[UID] $pfx/Library/LaunchAgents/org.git-scm.git.%s.plist\n" \
 		hourly daily weekly >expect &&
 	test_cmp expect args &&
 	ls "$HOME/Library/LaunchAgents" >actual &&
