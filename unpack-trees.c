@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "gvfs.h"
 #include "strvec.h"
 #include "repository.h"
 #include "config.h"
