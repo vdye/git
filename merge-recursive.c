@@ -5,6 +5,7 @@
  */
 #include "cache.h"
 #include "merge-recursive.h"
+#include "virtualfilesystem.h"
 
 #include "advice.h"
 #include "alloc.h"
@@ -29,7 +30,6 @@
 #include "tree-walk.h"
 #include "unpack-trees.h"
 #include "xdiff-interface.h"
-#include "virtualfilesystem.h"
 
 struct merge_options_internal {
 	int call_depth;
