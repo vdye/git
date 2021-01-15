@@ -6,6 +6,7 @@
  *
  */
 #include "cache.h"
+#include "gvfs.h"
 #include "branch.h"
 #include "config.h"
 #include "repository.h"
@@ -20,7 +21,6 @@
 #include "dir.h"
 #include "color.h"
 #include "refs.h"
-#include "gvfs.h"
 #include "transport.h"
 
 struct config_source {
