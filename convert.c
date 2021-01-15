@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "gvfs.h"
 #include "config.h"
 #include "object-store.h"
 #include "attr.h"
@@ -9,7 +10,6 @@
 #include "sub-process.h"
 #include "utf8.h"
 #include "ll-merge.h"
-#include "gvfs.h"
 
 /*
  * convert.c - convert a file when checking it out and checking it in.
