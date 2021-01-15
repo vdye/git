@@ -33,6 +33,8 @@ test_description="Test core.fsmonitor"
 #
 # GIT_PERF_7519_DROP_CACHE: if set, the OS caches are dropped between tests
 #
+# GIT_PERF_7519_TRACE: if set, enable trace logging during the test.
+#   Trace logs will be grouped by fsmonitor provider.
 
 test_perf_large_repo
 test_checkout_worktree
@@ -70,6 +72,32 @@ then
 		GIT_PERF_REPEAT_COUNT=1
 	fi
 fi
+
+trace_start() {
+	if test -n "$GIT_PERF_7519_TRACE"
+	then
+		name="$1"
+		TEST_TRACE_DIR="$TEST_OUTPUT_DIRECTORY/test-trace/p7519/"
+		echo "Writing trace logging to $TEST_TRACE_DIR"
+
+		mkdir -p "$TEST_TRACE_DIR"
+
+		# Start Trace2 logging and any other GIT_TRACE_* logs that you
+		# want for this named test case.
+
+		GIT_TRACE2_PERF="$TEST_TRACE_DIR/$name.trace2perf"
+		export GIT_TRACE2_PERF
+
+		>"$GIT_TRACE2_PERF"
+	fi
+}
+
+trace_stop() {
+	if test -n "$GIT_PERF_7519_TRACE"
+	then
+		unset GIT_TRACE2_PERF
+	fi
+}
 
 test_expect_success "one time repo setup" '
 	# set untrackedCache depending on the environment
@@ -204,6 +232,7 @@ test_fsmonitor_suite() {
 # such as Watchman.
 #
 
+trace_start fsmonitor-watchman
 if test -n "$GIT_PERF_7519_FSMONITOR"; then
 	for INTEGRATION_PATH in $GIT_PERF_7519_FSMONITOR; do
 		test_expect_success "setup for fsmonitor $INTEGRATION_PATH" 'setup_for_fsmonitor'
@@ -222,11 +251,13 @@ then
 	# preventing the removal of the trash directory
 	watchman shutdown-server >/dev/null 2>&1
 fi
+trace_stop
 
 #
 # Run a full set of perf tests with the fsmonitor feature disabled.
 #
 
+trace_start fsmonitor-disabled
 test_expect_success "setup without fsmonitor" '
 	unset INTEGRATION_SCRIPT &&
 	git config --unset core.fsmonitor &&
@@ -234,6 +265,7 @@ test_expect_success "setup without fsmonitor" '
 '
 
 test_fsmonitor_suite
+trace_stop
 
 #
 # Run a full set of perf tests using the internal fsmonitor--daemon.
@@ -250,12 +282,15 @@ if test_have_prereq HAVE_FSMONITOR_DAEMON
 then
 	INTEGRATION_PATH=":internal:"
 
+	trace_start fsmonitor--daemon--server
 	git fsmonitor--daemon --start
 
+	trace_start fsmonitor--daemon--client
 	test_expect_success "setup for fsmonitor--daemon" 'setup_for_fsmonitor'
 	test_fsmonitor_suite
 
 	git fsmonitor--daemon --stop
+	trace_stop
 fi
 
 test_done
