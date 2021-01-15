@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "gvfs.h"
 #include "object-store.h"
 #include "run-command.h"
 #include "sigchain.h"
@@ -6,7 +7,6 @@
 #include "transport.h"
 #include "packfile.h"
 #include "promisor-remote.h"
-#include "gvfs.h"
 
 /*
  * If we feed all the commits we want to verify to this command

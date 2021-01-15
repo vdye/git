@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "gvfs.h"
 #include "lockfile.h"
 #include "tree.h"
 #include "tree-walk.h"
@@ -6,7 +7,6 @@
 #include "object-store.h"
 #include "replace-object.h"
 #include "promisor-remote.h"
-#include "gvfs.h"
 
 #ifndef DEBUG_CACHE_TREE
 #define DEBUG_CACHE_TREE 0

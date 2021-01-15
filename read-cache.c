@@ -4,6 +4,8 @@
  * Copyright (C) Linus Torvalds, 2005
  */
 #include "cache.h"
+#include "gvfs.h"
+#include "virtualfilesystem.h"
 #include "config.h"
 #include "diff.h"
 #include "diffcore.h"
@@ -25,8 +27,6 @@
 #include "fsmonitor.h"
 #include "thread-utils.h"
 #include "progress.h"
-#include "virtualfilesystem.h"
-#include "gvfs.h"
 
 /* Mask for the name length in ce_flags in the on-disk index */
 

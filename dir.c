@@ -6,6 +6,7 @@
  *		 Junio Hamano, 2005-2006
  */
 #include "cache.h"
+#include "virtualfilesystem.h"
 #include "config.h"
 #include "dir.h"
 #include "object-store.h"
@@ -18,7 +19,6 @@
 #include "ewah/ewok.h"
 #include "fsmonitor.h"
 #include "submodule-config.h"
-#include "virtualfilesystem.h"
 
 /*
  * Tells read_directory_recursive how a file or directory should be treated.

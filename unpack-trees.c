@@ -1,4 +1,6 @@
 #include "cache.h"
+#include "gvfs.h"
+#include "virtualfilesystem.h"
 #include "strvec.h"
 #include "repository.h"
 #include "config.h"
@@ -16,8 +18,6 @@
 #include "fsmonitor.h"
 #include "object-store.h"
 #include "promisor-remote.h"
-#include "gvfs.h"
-#include "virtualfilesystem.h"
 #include "packfile.h"
 
 /*

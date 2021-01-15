@@ -5,6 +5,7 @@
  */
 #define USE_THE_INDEX_COMPATIBILITY_MACROS
 #include "cache.h"
+#include "gvfs.h"
 #include "config.h"
 #include "lockfile.h"
 #include "quote.h"
@@ -18,7 +19,6 @@
 #include "dir.h"
 #include "split-index.h"
 #include "fsmonitor.h"
-#include "gvfs.h"
 
 /*
  * Default to not allowing changes to the list of files. The
