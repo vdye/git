@@ -194,26 +194,34 @@ int packet_write_fmt_gently(int fd, const char *fmt, ...)
 	return status;
 }
 
-int packet_write_gently(const int fd_out, const char *buf, size_t size)
+/*
+ * Use the provided scratch space to build a combined <hdr><buf> buffer
+ * and write it to the file descriptor (in one write if possible).
+ */
+int packet_write_gently(const int fd_out, const char *buf, size_t size,
+			struct packet_scratch_space *scratch)
 {
-	static char packet_write_buffer[LARGE_PACKET_MAX];
 	size_t packet_size;
 
-	if (size > sizeof(packet_write_buffer) - 4)
+	if (size > sizeof(scratch->buffer) - 4)
 		return error(_("packet write failed - data exceeds max packet size"));
 
 	packet_trace(buf, size, 1);
 	packet_size = size + 4;
-	set_packet_header(packet_write_buffer, packet_size);
-	memcpy(packet_write_buffer + 4, buf, size);
-	if (write_in_full(fd_out, packet_write_buffer, packet_size) < 0)
+
+	set_packet_header(scratch->buffer, packet_size);
+	memcpy(scratch->buffer + 4, buf, size);
+
+	if (write_in_full(fd_out, scratch->buffer, packet_size) < 0)
 		return error(_("packet write failed"));
 	return 0;
 }
 
 void packet_write(int fd_out, const char *buf, size_t size)
 {
-	if (packet_write_gently(fd_out, buf, size))
+	static struct packet_scratch_space scratch;
+
+	if (packet_write_gently(fd_out, buf, size, &scratch))
 		die_errno(_("packet write failed"));
 }
 
@@ -244,6 +252,12 @@ void packet_buf_write_len(struct strbuf *buf, const char *data, size_t len)
 
 int write_packetized_from_fd(int fd_in, int fd_out)
 {
+	/*
+	 * TODO We could save a memcpy() if we essentially inline
+	 * TODO packet_write_gently() here and change the xread()
+	 * TODO to pass &buf[4].
+	 */
+	static struct packet_scratch_space scratch;
 	static char buf[LARGE_PACKET_DATA_MAX];
 	int err = 0;
 	ssize_t bytes_to_write;
@@ -254,7 +268,7 @@ int write_packetized_from_fd(int fd_in, int fd_out)
 			return COPY_READ_ERROR;
 		if (bytes_to_write == 0)
 			break;
-		err = packet_write_gently(fd_out, buf, bytes_to_write);
+		err = packet_write_gently(fd_out, buf, bytes_to_write, &scratch);
 	}
 	if (!err)
 		err = packet_flush_gently(fd_out);
@@ -263,6 +277,7 @@ int write_packetized_from_fd(int fd_in, int fd_out)
 
 int write_packetized_from_buf(const char *src_in, size_t len, int fd_out)
 {
+	static struct packet_scratch_space scratch;
 	int err = 0;
 	size_t bytes_written = 0;
 	size_t bytes_to_write;
@@ -274,7 +289,7 @@ int write_packetized_from_buf(const char *src_in, size_t len, int fd_out)
 			bytes_to_write = len - bytes_written;
 		if (bytes_to_write == 0)
 			break;
-		err = packet_write_gently(fd_out, src_in + bytes_written, bytes_to_write);
+		err = packet_write_gently(fd_out, src_in + bytes_written, bytes_to_write, &scratch);
 		bytes_written += bytes_to_write;
 	}
 	if (!err)

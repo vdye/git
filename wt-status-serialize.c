@@ -189,6 +189,7 @@ static void wt_serialize_v1_header(struct wt_status *s, int fd)
 static inline void wt_serialize_v1_changed(struct wt_status *s, int fd,
 					   struct string_list_item *item)
 {
+	static struct packet_scratch_space scratch;
 	struct wt_status_change_data *d = item->util;
 	struct wt_status_serialize_data sd;
 	char *begin;
@@ -255,7 +256,7 @@ static inline void wt_serialize_v1_changed(struct wt_status *s, int fd,
 	*p++ = '\0';
 	*p++ = '\n';
 
-	if (packet_write_gently(fd, begin, (p - begin)))
+	if (packet_write_gently(fd, begin, (p - begin), &scratch))
 		BUG("cannot serialize '%s'", item->string);
 }
 
