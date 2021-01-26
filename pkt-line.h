@@ -43,6 +43,8 @@ int packet_write_gently(const int fd_out, const char *buf, size_t size,
 			struct packet_scratch_space *scratch);
 int write_packetized_from_fd(int fd_in, int fd_out);
 int write_packetized_from_buf(const char *src_in, size_t len, int fd_out);
+int write_packetized_from_buf2(const char *src_in, size_t len, int fd_out,
+			       struct packet_scratch_space *scratch);
 
 /*
  * Read a packetized line into the buffer, which must be at least size bytes
