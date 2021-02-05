@@ -1,14 +1,6 @@
 #include "cache.h"
 #include "unix-socket.h"
 
-static int unix_stream_socket(void)
-{
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (fd < 0)
-		die_errno("unable to create socket");
-	return fd;
-}
-
 static int chdir_len(const char *orig, int len)
 {
 	char *path = xmemdupz(orig, len);
@@ -19,7 +11,14 @@ static int chdir_len(const char *orig, int len)
 
 struct unix_sockaddr_context {
 	char *orig_dir;
+	unsigned int disallow_chdir:1;
 };
+
+#define UNIX_SOCKADDR_CONTEXT_INIT \
+{ \
+	.orig_dir=NULL, \
+	.disallow_chdir=0, \
+}
 
 static void unix_sockaddr_cleanup(struct unix_sockaddr_context *ctx)
 {
@@ -40,7 +39,11 @@ static int unix_sockaddr_init(struct sockaddr_un *sa, const char *path,
 {
 	int size = strlen(path) + 1;
 
-	ctx->orig_dir = NULL;
+	if (ctx->disallow_chdir && size > sizeof(sa->sun_path)) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
 	if (size > sizeof(sa->sun_path)) {
 		const char *slash = find_last_dir_sep(path);
 		const char *dir;
@@ -73,13 +76,18 @@ static int unix_sockaddr_init(struct sockaddr_un *sa, const char *path,
 
 int unix_stream_connect(const char *path)
 {
-	int fd, saved_errno;
+	int fd = -1;
+	int saved_errno;
 	struct sockaddr_un sa;
-	struct unix_sockaddr_context ctx;
+	struct unix_sockaddr_context ctx = UNIX_SOCKADDR_CONTEXT_INIT;
 
 	if (unix_sockaddr_init(&sa, path, &ctx) < 0)
 		return -1;
-	fd = unix_stream_socket();
+
+	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		goto fail;
+
 	if (connect(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0)
 		goto fail;
 	unix_sockaddr_cleanup(&ctx);
@@ -88,27 +96,43 @@ int unix_stream_connect(const char *path)
 fail:
 	saved_errno = errno;
 	unix_sockaddr_cleanup(&ctx);
-	close(fd);
+	if (fd != -1)
+		close(fd);
 	errno = saved_errno;
 	return -1;
 }
 
-int unix_stream_listen(const char *path)
+int unix_stream_listen(const char *path,
+		       const struct unix_stream_listen_opts *opts)
 {
-	int fd, saved_errno;
+	int fd = -1;
+	int saved_errno;
+	int bind_successful = 0;
+	int backlog;
 	struct sockaddr_un sa;
-	struct unix_sockaddr_context ctx;
+	struct unix_sockaddr_context ctx = UNIX_SOCKADDR_CONTEXT_INIT;
 
-	unlink(path);
+	ctx.disallow_chdir = opts->disallow_chdir;
 
 	if (unix_sockaddr_init(&sa, path, &ctx) < 0)
 		return -1;
-	fd = unix_stream_socket();
+
+	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		goto fail;
+
+	if (opts->force_unlink_before_bind)
+		unlink(path);
 
 	if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0)
 		goto fail;
+	bind_successful = 1;
 
-	if (listen(fd, 5) < 0)
+	if (opts->listen_backlog_size > 0)
+		backlog = opts->listen_backlog_size;
+	else
+		backlog = 5;
+	if (listen(fd, backlog) < 0)
 		goto fail;
 
 	unix_sockaddr_cleanup(&ctx);
@@ -117,7 +141,10 @@ int unix_stream_listen(const char *path)
 fail:
 	saved_errno = errno;
 	unix_sockaddr_cleanup(&ctx);
-	close(fd);
+	if (fd != -1)
+		close(fd);
+	if (bind_successful)
+		unlink(path);
 	errno = saved_errno;
 	return -1;
 }

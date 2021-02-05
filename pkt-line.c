@@ -194,26 +194,34 @@ int packet_write_fmt_gently(int fd, const char *fmt, ...)
 	return status;
 }
 
-int packet_write_gently(const int fd_out, const char *buf, size_t size)
+/*
+ * Use the provided scratch space to build a combined <hdr><buf> buffer
+ * and write it to the file descriptor (in one write if possible).
+ */
+int packet_write_gently(const int fd_out, const char *buf, size_t size,
+			struct packet_scratch_space *scratch)
 {
-	static char packet_write_buffer[LARGE_PACKET_MAX];
 	size_t packet_size;
 
-	if (size > sizeof(packet_write_buffer) - 4)
+	if (size > sizeof(scratch->buffer) - 4)
 		return error(_("packet write failed - data exceeds max packet size"));
 
 	packet_trace(buf, size, 1);
 	packet_size = size + 4;
-	set_packet_header(packet_write_buffer, packet_size);
-	memcpy(packet_write_buffer + 4, buf, size);
-	if (write_in_full(fd_out, packet_write_buffer, packet_size) < 0)
+
+	set_packet_header(scratch->buffer, packet_size);
+	memcpy(scratch->buffer + 4, buf, size);
+
+	if (write_in_full(fd_out, scratch->buffer, packet_size) < 0)
 		return error(_("packet write failed"));
 	return 0;
 }
 
 void packet_write(int fd_out, const char *buf, size_t size)
 {
-	if (packet_write_gently(fd_out, buf, size))
+	static struct packet_scratch_space scratch;
+
+	if (packet_write_gently(fd_out, buf, size, &scratch))
 		die_errno(_("packet write failed"));
 }
 
@@ -244,6 +252,12 @@ void packet_buf_write_len(struct strbuf *buf, const char *data, size_t len)
 
 int write_packetized_from_fd(int fd_in, int fd_out)
 {
+	/*
+	 * TODO We could save a memcpy() if we essentially inline
+	 * TODO packet_write_gently() here and change the xread()
+	 * TODO to pass &buf[4].
+	 */
+	static struct packet_scratch_space scratch;
 	static char buf[LARGE_PACKET_DATA_MAX];
 	int err = 0;
 	ssize_t bytes_to_write;
@@ -254,14 +268,25 @@ int write_packetized_from_fd(int fd_in, int fd_out)
 			return COPY_READ_ERROR;
 		if (bytes_to_write == 0)
 			break;
-		err = packet_write_gently(fd_out, buf, bytes_to_write);
+		err = packet_write_gently(fd_out, buf, bytes_to_write, &scratch);
 	}
 	if (!err)
 		err = packet_flush_gently(fd_out);
 	return err;
 }
 
-int write_packetized_from_buf(const char *src_in, size_t len, int fd_out)
+int write_packetized_from_buf(const char *src_in, size_t len, int fd_out,
+			      int flush_at_end)
+{
+	static struct packet_scratch_space scratch;
+
+	return write_packetized_from_buf2(src_in, len, fd_out,
+					  flush_at_end, &scratch);
+}
+
+int write_packetized_from_buf2(const char *src_in, size_t len, int fd_out,
+			       int flush_at_end,
+			       struct packet_scratch_space *scratch)
 {
 	int err = 0;
 	size_t bytes_written = 0;
@@ -274,10 +299,10 @@ int write_packetized_from_buf(const char *src_in, size_t len, int fd_out)
 			bytes_to_write = len - bytes_written;
 		if (bytes_to_write == 0)
 			break;
-		err = packet_write_gently(fd_out, src_in + bytes_written, bytes_to_write);
+		err = packet_write_gently(fd_out, src_in + bytes_written, bytes_to_write, scratch);
 		bytes_written += bytes_to_write;
 	}
-	if (!err)
+	if (!err && flush_at_end)
 		err = packet_flush_gently(fd_out);
 	return err;
 }
@@ -298,8 +323,11 @@ static int get_packet_data(int fd, char **src_buf, size_t *src_size,
 		*src_size -= ret;
 	} else {
 		ret = read_in_full(fd, dst, size);
-		if (ret < 0)
+		if (ret < 0) {
+			if (options & PACKET_READ_NEVER_DIE)
+				return error_errno(_("read error"));
 			die_errno(_("read error"));
+		}
 	}
 
 	/* And complain if we didn't get enough bytes to satisfy the read. */
@@ -307,6 +335,8 @@ static int get_packet_data(int fd, char **src_buf, size_t *src_size,
 		if (options & PACKET_READ_GENTLE_ON_EOF)
 			return -1;
 
+		if (options & PACKET_READ_NEVER_DIE)
+			return error(_("the remote end hung up unexpectedly"));
 		die(_("the remote end hung up unexpectedly"));
 	}
 
@@ -335,6 +365,9 @@ enum packet_read_status packet_read_with_status(int fd, char **src_buffer,
 	len = packet_length(linelen);
 
 	if (len < 0) {
+		if (options & PACKET_READ_NEVER_DIE)
+			return error(_("protocol error: bad line length "
+				       "character: %.4s"), linelen);
 		die(_("protocol error: bad line length character: %.4s"), linelen);
 	} else if (!len) {
 		packet_trace("0000", 4, 0);
@@ -349,12 +382,19 @@ enum packet_read_status packet_read_with_status(int fd, char **src_buffer,
 		*pktlen = 0;
 		return PACKET_READ_RESPONSE_END;
 	} else if (len < 4) {
+		if (options & PACKET_READ_NEVER_DIE)
+			return error(_("protocol error: bad line length %d"),
+				     len);
 		die(_("protocol error: bad line length %d"), len);
 	}
 
 	len -= 4;
-	if ((unsigned)len >= size)
+	if ((unsigned)len >= size) {
+		if (options & PACKET_READ_NEVER_DIE)
+			return error(_("protocol error: bad line length %d"),
+				     len);
 		die(_("protocol error: bad line length %d"), len);
+	}
 
 	if (get_packet_data(fd, src_buffer, src_len, buffer, len, options) < 0) {
 		*pktlen = -1;
@@ -421,7 +461,7 @@ char *packet_read_line_buf(char **src, size_t *src_len, int *dst_len)
 	return packet_read_line_generic(-1, src, src_len, dst_len);
 }
 
-ssize_t read_packetized_to_strbuf(int fd_in, struct strbuf *sb_out)
+ssize_t read_packetized_to_strbuf(int fd_in, struct strbuf *sb_out, int options)
 {
 	int packet_len;
 
@@ -437,7 +477,7 @@ ssize_t read_packetized_to_strbuf(int fd_in, struct strbuf *sb_out)
 			 * that there is already room for the extra byte.
 			 */
 			sb_out->buf + sb_out->len, LARGE_PACKET_DATA_MAX+1,
-			PACKET_READ_GENTLE_ON_EOF);
+			options | PACKET_READ_GENTLE_ON_EOF);
 		if (packet_len <= 0)
 			break;
 		sb_out->len += packet_len;
