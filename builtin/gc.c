@@ -1610,7 +1610,7 @@ static int launchctl_schedule_plist(const char *exec_path, enum schedule_priorit
 		die(_("failed to create directories for '%s'"), filename);
 	plist = xfopen(filename, "w");
 
-	preamble = "<?xml version=\"1.0\" encoding=\"US-ASCII\"?>\n"
+	preamble = "<?xml version=\"1.0\"?>\n"
 		   "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
 		   "<plist version=\"1.0\">"
 		   "<dict>\n"
@@ -1813,7 +1813,7 @@ static int schtasks_schedule_task(const char *exec_path, enum schedule_priority 
 	      "</Settings>\n"
 	      "<Actions Context=\"Author\">\n"
 	      "<Exec>\n"
-	      "<Command>\"%s\\git.exe\"</Command>\n"
+	      "<Command>\"%s\\headless-git.exe\"</Command>\n"
 	      "<Arguments>--exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%s</Arguments>\n"
 	      "</Exec>\n"
 	      "</Actions>\n"
