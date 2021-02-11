@@ -415,8 +415,7 @@ static int check_updates(struct unpack_trees_options *o,
 
 	if (!o->update || o->dry_run) {
 		remove_marked_cache_entries(index, 0);
-		trace_performance_leave("check_updates");
-		return 0;
+		goto done;
 	}
 
 	if (o->clone)
@@ -495,8 +494,9 @@ static int check_updates(struct unpack_trees_options *o,
 		trace2_data_intmax("unpack_trees", NULL, "check_updates/nr_prefetch", sum_prefetch);
 	if (sum_checkout > 0)
 		trace2_data_intmax("unpack_trees", NULL, "check_updates/nr_write", sum_checkout);
-	trace2_region_leave("unpack_trees", "check_updates", NULL);
 
+done:
+	trace2_region_leave("unpack_trees", "check_updates", NULL);
 	trace_performance_leave("check_updates");
 	return errs != 0;
 }
