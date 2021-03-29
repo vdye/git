@@ -1921,7 +1921,7 @@ static int service_loop(struct socketlist *socklist)
 	struct pollfd *pfd;
 	int i;
 
-	pfd = xcalloc(socklist->nr, sizeof(struct pollfd));
+	CALLOC_ARRAY(pfd, socklist->nr);
 
 	for (i = 0; i < socklist->nr; i++) {
 		pfd[i].fd = socklist->list[i];
