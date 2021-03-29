@@ -833,8 +833,7 @@ int ipc_server_run_async(struct ipc_server_data **returned_server_data,
 	pthread_cond_init(&server_data->work_available_cond, NULL);
 
 	server_data->queue_size = nr_threads * FIFO_SCALE;
-	server_data->fifo_fds = xcalloc(server_data->queue_size,
-					sizeof(*server_data->fifo_fds));
+	CALLOC_ARRAY(server_data->fifo_fds, server_data->queue_size);
 
 	server_data->accept_thread =
 		xcalloc(1, sizeof(*server_data->accept_thread));
