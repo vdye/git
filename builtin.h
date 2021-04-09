@@ -194,6 +194,7 @@ int cmd_multi_pack_index(int argc, const char **argv, const char *prefix);
 int cmd_mv(int argc, const char **argv, const char *prefix);
 int cmd_name_rev(int argc, const char **argv, const char *prefix);
 int cmd_notes(int argc, const char **argv, const char *prefix);
+int cmd_odb__daemon(int argc, const char **argv, const char *prefix);
 int cmd_pack_objects(int argc, const char **argv, const char *prefix);
 int cmd_pack_redundant(int argc, const char **argv, const char *prefix);
 int cmd_patch_id(int argc, const char **argv, const char *prefix);
