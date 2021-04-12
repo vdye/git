@@ -6,6 +6,26 @@
 #include "gettext.h"
 #include "parse-options.h"
 #include "config.h"
+#include "run-command.h"
+
+static int run_git(const char *dir, const char *arg, ...)
+{
+	struct strvec argv = STRVEC_INIT;
+	va_list args;
+	const char *p;
+	int res;
+
+	va_start(args, arg);
+	strvec_push(&argv, arg);
+	while ((p = va_arg(args, const char *)))
+		strvec_push(&argv, p);
+	va_end(args);
+
+	res = run_command_v_opt_cd_env(argv.v, RUN_GIT_CMD, dir, NULL);
+
+	strvec_clear(&argv);
+	return res;
+}
 
 static int set_recommended_config(const char *file)
 {
@@ -65,13 +85,27 @@ static int set_recommended_config(const char *file)
 	return 0;
 }
 
+static int toggle_maintenance(const char *dir, int enable)
+{
+	return run_git(dir, "maintenance", enable ? "start" : "unregister",
+		       NULL);
+}
+
 static int register_dir(const char *dir)
 {
 	char *config_path = dir ? xstrfmt("%s/.git/config", dir) : NULL;
 	int res = set_recommended_config(config_path);
 
 	free(config_path);
+	if (!res)
+		res = toggle_maintenance(dir, 1);
+
 	return res;
+}
+
+static int unregister_dir(const char *dir)
+{
+	return toggle_maintenance(dir, 0);
 }
 
 static int cmd_register(int argc, const char **argv)
@@ -82,12 +116,21 @@ static int cmd_register(int argc, const char **argv)
 	return register_dir(argc < 2 ? NULL : argv[1]);
 }
 
+static int cmd_unregister(int argc, const char **argv)
+{
+	if (argc != 1 && argc != 2)
+		usage(_("scalar unregister [<worktree>]"));
+
+	return unregister_dir(argc < 2 ? NULL : argv[1]);
+}
+
 struct {
 	const char *name;
 	int (*fn)(int, const char **);
 	int needs_git_repo;
 } builtins[] = {
 	{ "register", cmd_register, 1 },
+	{ "unregister", cmd_unregister, 1 },
 	{ NULL, NULL},
 };
 
