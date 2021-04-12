@@ -91,12 +91,46 @@ static int toggle_maintenance(const char *dir, int enable)
 		       NULL);
 }
 
+static int add_or_remove_enlistment(const char *dir, int add)
+{
+	char *p = NULL;
+	const char *worktree;
+	int res;
+
+	if (dir)
+		worktree = p = real_pathdup(dir, 1);
+	else if (!the_repository->worktree)
+		die(_("Scalar enlistments require a worktree"));
+	else
+		worktree = the_repository->worktree;
+
+	res = run_git(dir, "config", "--global", "--get",
+		      "--fixed-value", "scalar.repo", worktree, NULL);
+
+	/*
+	 * If we want to add and the setting is already there, then do nothing.
+	 * If we want to remove and the setting is not there, then do nothing.
+	 */
+	if ((add && !res) || (!add && res))
+		return 0;
+
+	return run_git(dir, "config", "--global",
+		       add ? "--add" : "--unset",
+		       add ? "--no-fixed-value" : "--fixed-value",
+		       "scalar.repo", worktree, NULL);
+}
+
 static int register_dir(const char *dir)
 {
-	char *config_path = dir ? xstrfmt("%s/.git/config", dir) : NULL;
-	int res = set_recommended_config(config_path);
+	int res = add_or_remove_enlistment(dir, 1);
 
-	free(config_path);
+	if (!res) {
+		char *config_path =
+			dir ? xstrfmt("%s/.git/config", dir) : NULL;
+		res = set_recommended_config(config_path);
+		free(config_path);
+	}
+
 	if (!res)
 		res = toggle_maintenance(dir, 1);
 
@@ -105,7 +139,21 @@ static int register_dir(const char *dir)
 
 static int unregister_dir(const char *dir)
 {
-	return toggle_maintenance(dir, 0);
+	int res = add_or_remove_enlistment(dir, 0);
+
+	if (!res)
+		res = toggle_maintenance(dir, 0);
+
+	return res;
+}
+
+static int cmd_list(int argc, const char **argv)
+{
+	if (argc != 1)
+		die(_("`scalar list` does not take arguments"));
+
+	return run_git(NULL, "config", "--global",
+		       "--get-all", "scalar.repo", NULL);
 }
 
 static int cmd_register(int argc, const char **argv)
@@ -129,6 +177,7 @@ struct {
 	int (*fn)(int, const char **);
 	int needs_git_repo;
 } builtins[] = {
+	{ "list", cmd_list, 0 },
 	{ "register", cmd_register, 1 },
 	{ "unregister", cmd_unregister, 1 },
 	{ NULL, NULL},
