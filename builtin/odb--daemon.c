@@ -81,6 +81,8 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 	uintmax_t umax_flags = 0;
 	int k;
 
+	trace2_printf("oid--daemon: received:\n%s", command);
+
 	oidclr(&oid);
 
 	for (k = 0; lines[k]; k++) {
@@ -108,7 +110,6 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		unsigned long var_size = 0;
 		off_t var_disk_size = 0;
 		struct object_id var_delta_base_oid;
-		struct strbuf var_type_name = STRBUF_INIT;
 		void *var_content = NULL;
 		struct object_info var_oi = OBJECT_INFO_INIT;
 		int ret;
@@ -119,7 +120,8 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		var_oi.sizep = &var_size;
 		var_oi.disk_sizep = &var_disk_size;
 		var_oi.delta_base_oid = &var_delta_base_oid;
-		var_oi.type_name = &var_type_name;
+		// TODO have the client send another field to indicate
+		// TODO whether it wants the contents or not.
 		var_oi.contentp = &var_content;
 
 		ret = oid_object_info_extended(the_repository, &oid, &var_oi,
@@ -132,18 +134,26 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		strbuf_addf(&response, "type %d\n", var_type);
 		strbuf_addf(&response, "size %"PRIuMAX"\n", (uintmax_t)var_size);
 		strbuf_addf(&response, "disk %"PRIuMAX"\n", (uintmax_t)var_disk_size);
-		// TODO only include delta base oid if non zero.
-		strbuf_addf(&response, "delta %s\n", oid_to_hex(&var_delta_base_oid));
-		strbuf_addf(&response, "name %s\n", var_type_name.buf);
+		if (!is_null_oid(&var_delta_base_oid))
+			strbuf_addf(&response, "delta %s\n", oid_to_hex(&var_delta_base_oid));
+		// TODO should we create a new fake whence value that we report to
+		// TODO the client -- something like "ipc" to indicate that the
+		// TODO client got it from us and therefore doesn't have the in-memory
+		// TODO cache nor any of the packfile data loaded.  The answer to this
+		// TODO also affects the oi.u.packed fields.
+		strbuf_addf(&response, "whence %d\n", var_oi.whence);
 
-		// TODO we do not care about oi.whence nor oi.u.packed
+		// TODO decide if we care about oi.u.packed
 
-		strbuf_addstr(&response, "content\n"); /* must be last */
+		trace2_printf("oid--daemon: sending:\n%s", response.buf);
 
-		reply_cb(reply_data, response.buf, response.len);
+		/*
+		 * Add one to the length of the headers to include the NUL and
+		 * then immediately send the object contents.
+		 */
+		reply_cb(reply_data, response.buf, response.len + 1);
 		reply_cb(reply_data, var_content, var_size);
 
-		strbuf_release(&var_type_name);
 		free(var_content);
 	}
 
@@ -160,7 +170,8 @@ fail:
 	goto done;
 
 done:
-	strbuf_list_free(lines);
+	if (lines)
+		strbuf_list_free(lines);
 	strbuf_release(&response);
 	return 0;
 }
