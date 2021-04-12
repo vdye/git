@@ -34,9 +34,6 @@ enum ipc_active_state odb_over_ipc__get_state(void);
  * and receive a response.  If no daemon is running, this DOES NOT try
  * to start one.
  *
- * Commands include:
- * [] ask for an object
- *
  * TODO If we can trust the code that creates/deletes packfiles, we
  * TODO might consider adding a command here to let that process tell
  * TODO the daemon to update the list of cached packfiles.
@@ -45,6 +42,25 @@ enum ipc_active_state odb_over_ipc__get_state(void);
  * TODO auto-start one.  Revisit this later.
  */
 int odb_over_ipc__command(const char *command, struct strbuf *answer);
+
+/*
+ * Connect to an existing `git odb--daemon` process and ask it for
+ * an object.  This is intended to be inserted into the client
+ * near `oid_object_info_extended()`.
+ *
+ * Returns non-zero when the caller should use the traditional
+ * method.
+ */
+struct object_info;
+
+int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
+			  struct object_info *oi, unsigned flags);
+
+/*
+ * Insurance to protect the daemon from calling ODB code and accidentally
+ * falling into the client-side code and trying to connect to itself.
+ */
+void odb_over_ipc__set_is_daemon(void);
 
 #endif /* SUPPORTS_SIMPLE_IPC */
 #endif /* ODB_OVER_IPC_H */

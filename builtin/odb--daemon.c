@@ -1,7 +1,9 @@
 #include "builtin.h"
 #include "config.h"
+#include "object-store.h"
 #include "parse-options.h"
 #include "simple-ipc.h"
+#include "strbuf.h"
 #include "thread-utils.h"
 #include "odb-over-ipc.h"
 
@@ -67,22 +69,120 @@ struct my_odb_ipc_state
 
 static struct my_odb_ipc_state my_state;
 
+static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
+			       const char *command,
+			       ipc_server_reply_cb *reply_cb,
+			       struct ipc_server_reply_data *reply_data)
+{
+	struct strbuf **lines = strbuf_split_str(command, '\n', 0);
+	struct strbuf response = STRBUF_INIT;
+	struct object_id oid;
+	const char *sz;
+	uintmax_t umax_flags = 0;
+	int k;
+
+	oidclr(&oid);
+
+	for (k = 0; lines[k]; k++) {
+		strbuf_trim_trailing_newline(lines[k]);
+
+		if (skip_prefix(lines[k]->buf, "oid ", &sz)) {
+			if (get_oid_hex(sz, &oid))
+				goto fail;
+			continue;
+		}
+
+		if (skip_prefix(lines[k]->buf, "flags ", &sz)) {
+			umax_flags = strtoumax(sz, NULL, 10);
+			continue;
+		}
+
+		BUG("unexpected line '%s' in OID request", lines[k]->buf);
+	}
+
+	// TODO Insert ODB lookup from in-memory database here.
+	// TODO For now, just do the regular lookup.
+
+	{
+		enum object_type var_type = OBJ_BAD;
+		unsigned long var_size = 0;
+		off_t var_disk_size = 0;
+		struct object_id var_delta_base_oid;
+		struct strbuf var_type_name = STRBUF_INIT;
+		void *var_content = NULL;
+		struct object_info var_oi = OBJECT_INFO_INIT;
+		int ret;
+
+		oidclr(&var_delta_base_oid);
+
+		var_oi.typep = &var_type;
+		var_oi.sizep = &var_size;
+		var_oi.disk_sizep = &var_disk_size;
+		var_oi.delta_base_oid = &var_delta_base_oid;
+		var_oi.type_name = &var_type_name;
+		var_oi.contentp = &var_content;
+
+		ret = oid_object_info_extended(the_repository, &oid, &var_oi,
+					       (unsigned)umax_flags);
+		if (ret)
+			goto fail;
+
+		strbuf_reset(&response);
+		strbuf_addf(&response, "oid %s\n", oid_to_hex(&oid));
+		strbuf_addf(&response, "type %d\n", var_type);
+		strbuf_addf(&response, "size %"PRIuMAX"\n", (uintmax_t)var_size);
+		strbuf_addf(&response, "disk %"PRIuMAX"\n", (uintmax_t)var_disk_size);
+		// TODO only include delta base oid if non zero.
+		strbuf_addf(&response, "delta %s\n", oid_to_hex(&var_delta_base_oid));
+		strbuf_addf(&response, "name %s\n", var_type_name.buf);
+
+		// TODO we do not care about oi.whence nor oi.u.packed
+
+		strbuf_addstr(&response, "content\n"); /* must be last */
+
+		reply_cb(reply_data, response.buf, response.len);
+		reply_cb(reply_data, var_content, var_size);
+
+		strbuf_release(&var_type_name);
+		free(var_content);
+	}
+
+	goto done;
+
+fail:
+	/*
+	 * Send the client an error response to force it to do
+	 * the work itself.
+	 */
+	strbuf_reset(&response);
+	strbuf_addstr(&response, "error");
+	reply_cb(reply_data, response.buf, response.len + 1);
+	goto done;
+
+done:
+	strbuf_list_free(lines);
+	strbuf_release(&response);
+	return 0;
+}
+
+/*
+ * This callback handles IPC requests from clients.  We run on an
+ * arbitrary thread.
+ *
+ * We expect `command` to be of the form:
+ *
+ * <command> := quit NUL
+ *            | TBC...
+ */
 static ipc_server_application_cb odb_ipc_cb;
 
 static int odb_ipc_cb(void *data, const char *command,
-		  ipc_server_reply_cb *reply_cb,
-		  struct ipc_server_reply_data *reply_data)
+		      ipc_server_reply_cb *reply_cb,
+		      struct ipc_server_reply_data *reply_data)
 {
 	struct my_odb_ipc_state *state = data;
 
 	assert(state == &my_state);
-
-	/*
-	 * We expect `command` to be of the form:
-	 *
-	 * <command> := quit NUL
-	 *            | TBC...
-	 */
 
 	if (!strcmp(command, "quit")) {
 		/*
@@ -98,7 +198,17 @@ static int odb_ipc_cb(void *data, const char *command,
 		return SIMPLE_IPC_QUIT;
 	}
 
-	// TODO respond to request from client.
+	if (!strncmp(command, "oid", 3)) {
+		/*
+		 * A client has requested that we lookup an object from the
+		 * ODB and send it to them.
+		 */
+		return odb_ipc_cb__get_oid(state, command, reply_cb, reply_data);
+	}
+
+	// TODO respond to other requests from client.
+	//
+	// TODO decide how to return an error for unknown commands.
 
 	return 0;
 }
@@ -130,6 +240,8 @@ static int launch_ipc_thread_pool(void)
 static int do_run_daemon(void)
 {
 	int ret;
+
+	odb_over_ipc__set_is_daemon();
 
 	// TODO Create mutexes and locks
 	//
@@ -181,8 +293,10 @@ static int client_send_stop(void)
 	/* The quit command does not return any response data. */
 	strbuf_release(&answer);
 
-	if (ret)
+	if (ret) {
+		die("could not send stop command to odb--daemon");
 		return ret;
+	}
 
 	trace2_region_enter("odb_client", "polling-for-daemon-exit", NULL);
 	while (odb_over_ipc__get_state() == IPC_STATE__LISTENING)
