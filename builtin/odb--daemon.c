@@ -58,9 +58,10 @@ static int is_daemon_listening(void)
 
 struct my_odb_ipc_state
 {
+	struct ipc_server_data *ipc_state;
 };
 
-static struct my_odb_ipc_state *my_state;
+static struct my_odb_ipc_state my_state;
 
 static ipc_server_application_cb odb_cb;
 
@@ -70,18 +71,14 @@ static int odb_cb(void *data, const char *command,
 {
 	struct my_odb_ipc_state *state = data;
 
-	assert(state == my_state);
+	assert(state == &my_state);
 
 	// TODO respond to request from client.
 
 	return 0;
 }
 
-/*
- * Use the simple SYNC interface, start the IPC thread pool, and
- * block the calling thread until it shuts down.
- */
-static int do_ipc(void)
+static int launch_ipc_thread_pool(void)
 {
 	int ret;
 	const char *path = odb_over_ipc__get_path();
@@ -90,7 +87,8 @@ static int do_ipc(void)
 		.nr_threads = my_args.nr_ipc_threads,
 	};
 
-	ret = ipc_server_run(path, &ipc_opts, odb_cb, my_state);
+	ret = ipc_server_run_async(&my_state.ipc_state,
+				   path, &ipc_opts, odb_cb, &my_state);
 
 	if (ret == -2) /* maybe we lost a startup race */
 		error(_("IPC socket/pipe already in use: '%s'"), path);
@@ -115,7 +113,9 @@ static int do_run_daemon(void)
 	// TODO Consider starting a thread to watch for new/deleted packfiles
 	// TODO and update the in-memory database.
 
-	ret = do_ipc();
+	ret = launch_ipc_thread_pool();
+	if (!ret)
+		ret = ipc_server_await(my_state.ipc_state);
 
 	// TODO As a precaution, send stop events to our other threads and
 	// TODO JOIN them.
