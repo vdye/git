@@ -485,23 +485,30 @@ static int do_io(struct ipc_server_thread_data *server_thread_data)
 		return error(_("could not create fd from pipe for '%s'"),
 			     server_thread_data->server_data->buf_path.buf);
 
-	ret = read_packetized_to_strbuf(
-		reply_data.fd, &buf,
-		PACKET_READ_GENTLE_ON_EOF | PACKET_READ_GENTLE_ON_READ_ERROR);
-	if (ret >= 0) {
-		ret = server_thread_data->server_data->application_cb(
-			server_thread_data->server_data->application_data,
-			buf.buf, buf.len, do_io_reply_callback, &reply_data);
+	for (;;) {
+		strbuf_reset(&buf);
+		ret = read_packetized_to_strbuf(
+			reply_data.fd, &buf,
+			PACKET_READ_GENTLE_ON_EOF | PACKET_READ_GENTLE_ON_READ_ERROR);
+		if (ret >= 0) {
+			ret = server_thread_data->server_data->application_cb(
+				server_thread_data->server_data->application_data,
+				buf.buf, buf.len, do_io_reply_callback, &reply_data);
 
-		packet_flush_gently(reply_data.fd);
+			packet_flush_gently(reply_data.fd);
 
-		FlushFileBuffers((HANDLE)_get_osfhandle((reply_data.fd)));
-	}
-	else {
-		/*
-		 * The client probably disconnected/shutdown before it
-		 * could send a well-formed message.  Ignore it.
-		 */
+			FlushFileBuffers((HANDLE)_get_osfhandle((reply_data.fd)));
+
+			if (ret == SIMPLE_IPC_QUIT)
+				break;
+		}
+		else {
+			/*
+			 * The client probably disconnected/shutdown before it
+			 * could send a well-formed message.  Ignore it.
+			 */
+			break;
+		}
 	}
 
 	strbuf_release(&buf);
