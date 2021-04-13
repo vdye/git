@@ -538,7 +538,6 @@ static int worker_thread__do_io(
 	}
 
 	strbuf_release(&buf);
-	close(reply_data.fd);
 
 	return ret;
 }
@@ -605,6 +604,7 @@ top:
 		}
 
 		ret = worker_thread__do_io(worker_thread_data, fd);
+		close(fd);
 
 		if (ret == SIMPLE_IPC_QUIT) {
 			trace2_data_string("ipc-worker", NULL, "queue_stop_async",
