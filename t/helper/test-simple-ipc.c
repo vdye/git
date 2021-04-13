@@ -576,6 +576,48 @@ static int client__multiple(void)
 	return (sum_join_errors + sum_thread_errors) ? 1 : 0;
 }
 
+/*
+ * Send a series of commands over a single connection keepalive-style.
+ */
+static int client__keepalive(void)
+{
+	struct ipc_client_connection *connection = NULL;
+	struct ipc_client_connect_options options
+		= IPC_CLIENT_CONNECT_OPTIONS_INIT;
+	struct strbuf answer = STRBUF_INIT;
+	int ret = 0;
+	int k;
+	enum ipc_active_state state;
+
+	strbuf_reset(&answer);
+
+	options.wait_if_busy = 1;
+	options.wait_if_not_found = 0;
+	options.uds_disallow_chdir = 0;
+
+	state = ipc_client_try_connect(cl_args.path, &options, &connection);
+	if (state != IPC_STATE__LISTENING)
+		return error("failed to connect to '%s'", cl_args.path);
+
+	for (k = 0; k < 10; k++) {
+		ret = ipc_client_send_command_to_connection(connection, "ping", &answer);
+		if (ret) {
+			error("failed to send ping[%d]", k);
+			goto cleanup;
+		}
+		if (answer.len) {
+			printf("%s\n", answer.buf);
+			fflush(stdout);
+		}
+	}
+
+cleanup:
+	ipc_client_close_connection(connection);
+	strbuf_release(&answer);
+
+	return ret;
+}
+
 int cmd__simple_ipc(int argc, const char **argv)
 {
 	const char * const simple_ipc_usage[] = {
@@ -586,6 +628,7 @@ int cmd__simple_ipc(int argc, const char **argv)
 		N_("test-helper simple-ipc send         [<name>] [<token>]"),
 		N_("test-helper simple-ipc sendbytes    [<name>] [<bytecount>] [<byte>]"),
 		N_("test-helper simple-ipc multiple     [<name>] [<threads>] [<bytecount>] [<batchsize>]"),
+		N_("test-helper simple-ipc keepalive    [<name>]"),
 		NULL
 	};
 
@@ -680,6 +723,12 @@ int cmd__simple_ipc(int argc, const char **argv)
 		if (client__probe_server())
 			return 1;
 		return !!client__multiple();
+	}
+
+	if (!strcmp(cl_args.subcommand, "keepalive")) {
+		if (client__probe_server())
+			return 1;
+		return !!client__keepalive();
 	}
 
 	die("Unhandled subcommand: '%s'", cl_args.subcommand);
