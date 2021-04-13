@@ -593,14 +593,19 @@ static void *worker_thread_proc(void *_worker_thread_data)
 
 	thread_block_sigpipe(&old_set);
 
+top:
 	for (;;) {
 		fd = worker_thread__wait_for_connection(worker_thread_data);
-		if (fd == -1)
-			break; /* in shutdown */
+		if (fd == -1) {
+			/* shutdown already requested */
+			goto shutdown;
+		}
 
 		io = worker_thread__wait_for_io_start(worker_thread_data, fd);
-		if (io == -1)
-			continue; /* client hung up without sending anything */
+		if (io == -1) {
+			/* client hung up without sending anything */
+			goto top;
+		}
 
 		ret = worker_thread__do_io(worker_thread_data, fd);
 
@@ -621,10 +626,11 @@ static void *worker_thread_proc(void *_worker_thread_data)
 			 * responding to their current clients.
 			 */
 			ipc_server_stop_async(server_data);
-			break;
+			goto shutdown;
 		}
 	}
 
+shutdown:
 	trace2_thread_exit();
 	return NULL;
 }
