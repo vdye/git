@@ -606,26 +606,28 @@ top:
 		ret = worker_thread__do_io(worker_thread_data, fd);
 		close(fd);
 
-		if (ret == SIMPLE_IPC_QUIT) {
-			trace2_data_string("ipc-worker", NULL, "queue_stop_async",
-					   "application_quit");
-			/*
-			 * The application layer is telling the ipc-server
-			 * layer to shutdown.
-			 *
-			 * We DO NOT have a response to send to the client.
-			 *
-			 * Queue an async stop (to stop the other threads) and
-			 * allow this worker thread to exit now (no sense waiting
-			 * for the thread-pool shutdown signal).
-			 *
-			 * Other non-idle worker threads are allowed to finish
-			 * responding to their current clients.
-			 */
-			ipc_server_stop_async(server_data);
-			goto shutdown;
-		}
+		if (ret == SIMPLE_IPC_QUIT)
+			goto quit;
 	}
+
+quit:
+	trace2_data_string("ipc-worker", NULL, "queue_stop_async",
+			   "application_quit");
+	/*
+	 * The application layer is telling the ipc-server
+	 * layer to shutdown.
+	 *
+	 * We DO NOT have a response to send to the client.
+	 *
+	 * Queue an async stop (to stop the other threads) and
+	 * allow this worker thread to exit now (no sense waiting
+	 * for the thread-pool shutdown signal).
+	 *
+	 * Other non-idle worker threads are allowed to finish
+	 * responding to their current clients.
+	 */
+	ipc_server_stop_async(server_data);
+	goto shutdown;
 
 shutdown:
 	trace2_thread_exit();
