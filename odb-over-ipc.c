@@ -71,6 +71,7 @@ int odb_over_ipc__command(const char *command, struct strbuf *answer)
 int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 			  struct object_info *oi, unsigned flags)
 {
+	char hex_buf[GIT_MAX_HEXSZ + 1];
 	struct strbuf cmd = STRBUF_INIT;
 	struct strbuf answer = STRBUF_INIT;
 	struct strbuf headers = STRBUF_INIT;
@@ -93,7 +94,7 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	 * the object, always get all of the optional fields.  That is, don't
 	 * worry with which fields within `oi` are populated on the request side.
 	 */
-	strbuf_addf(&cmd, "oid %s\n", oid_to_hex(oid));
+	strbuf_addf(&cmd, "oid %s\n", oid_to_hex_r(hex_buf, oid));
 	strbuf_addf(&cmd, "flags %"PRIuMAX"\n", (uintmax_t)flags);
 	// TODO send another row to indicate whether we want the content buffer.
 
