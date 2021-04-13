@@ -596,18 +596,19 @@ top:
 			goto shutdown;
 		}
 
-		io = worker_thread__wait_for_io_start(worker_thread_data, fd);
-		if (io == -1) {
-			/* client hung up without sending anything */
-			close(fd);
-			goto top;
+		for (;;) {
+			io = worker_thread__wait_for_io_start(worker_thread_data, fd);
+			if (io == -1) {
+				/* client hung up without sending anything */
+				close(fd);
+				goto top;
+			}
+
+			ret = worker_thread__do_io(worker_thread_data, fd);
+
+			if (ret == SIMPLE_IPC_QUIT)
+				goto quit;
 		}
-
-		ret = worker_thread__do_io(worker_thread_data, fd);
-		close(fd);
-
-		if (ret == SIMPLE_IPC_QUIT)
-			goto quit;
 	}
 
 quit:
