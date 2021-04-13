@@ -52,6 +52,7 @@ int odb_over_ipc__command(const char *command, struct strbuf *answer);
  * method.
  */
 struct object_info;
+struct repository;
 
 int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 			  struct object_info *oi, unsigned flags);
