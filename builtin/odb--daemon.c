@@ -6,6 +6,7 @@
 #include "strbuf.h"
 #include "thread-utils.h"
 #include "odb-over-ipc.h"
+#include "trace2.h"
 
 enum my_mode {
 	MODE_UNDEFINED = 0,
@@ -81,7 +82,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 	uintmax_t umax_flags = 0;
 	int k;
 
-	trace2_printf("oid--daemon: received:\n%s", command);
+	// trace2_printf("oid--daemon: received:\n%s", command);
 
 	oidclr(&oid);
 
@@ -145,7 +146,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 
 		// TODO decide if we care about oi.u.packed
 
-		trace2_printf("oid--daemon: sending:\n%s", response.buf);
+		// trace2_printf("oid--daemon: sending:\n%s", response.buf);
 
 		/*
 		 * Add one to the length of the headers to include the NUL and
@@ -192,6 +193,7 @@ static int odb_ipc_cb(void *data, const char *command,
 		      struct ipc_server_reply_data *reply_data)
 {
 	struct my_odb_ipc_state *state = data;
+	int ret;
 
 	assert(state == &my_state);
 
@@ -214,7 +216,11 @@ static int odb_ipc_cb(void *data, const char *command,
 		 * A client has requested that we lookup an object from the
 		 * ODB and send it to them.
 		 */
-		return odb_ipc_cb__get_oid(state, command, reply_cb, reply_data);
+		trace2_region_enter("odb-daemon", "get-oid", NULL);
+		ret = odb_ipc_cb__get_oid(state, command, reply_cb, reply_data);
+		trace2_region_leave("odb-daemon", "get-oid", NULL);
+
+		return ret;
 	}
 
 	// TODO respond to other requests from client.
