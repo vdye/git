@@ -53,4 +53,6 @@ then
 fi
 check_unignored_build_artifacts
 
+make -C contrib/scalar test
+
 save_good_tree

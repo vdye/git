@@ -15,4 +15,9 @@ group "Run tests" make --quiet -C t T="$(cd t &&
 	tr '\n' ' ')" ||
 handle_failed_tests
 
+if test 0 = "$1"
+then
+	make -C contrib/scalar test
+fi
+
 check_unignored_build_artifacts
