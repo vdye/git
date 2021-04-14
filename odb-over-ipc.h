@@ -58,6 +58,13 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 			  struct object_info *oi, unsigned flags);
 
 /*
+ * Explicitly shutdown IPC connection to the `git odb--daemon` process.
+ * The connection is implicitly created upon the first request and we
+ * use a keep-alive model to re-use it for subsequent requests.
+ */
+void odb_over_ipc__shutdown_keepalive_connection(void);
+
+/*
  * Insurance to protect the daemon from calling ODB code and accidentally
  * falling into the client-side code and trying to connect to itself.
  */
