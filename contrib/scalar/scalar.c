@@ -7,6 +7,7 @@
 #include "parse-options.h"
 #include "config.h"
 #include "run-command.h"
+#include "refs.h"
 
 static int run_git(const char *dir, const char *arg, ...)
 {
@@ -297,7 +298,16 @@ static int cmd_clone(int argc, const char **argv)
 	if (is_non_empty_dir(dir))
 		die(_("'%s' exists and is not empty"), dir);
 
-	if ((res = run_git(NULL, "init", "--", dir, NULL)))
+	strbuf_reset(&buf);
+	if (branch)
+		strbuf_addf(&buf, "init.defaultBranch=%s", branch);
+	else {
+		char *b = repo_default_branch_name(the_repository, 1);
+		strbuf_addf(&buf, "init.defaultBranch=%s", b);
+		free(b);
+	}
+
+	if ((res = run_git(NULL, "-c", buf.buf, "init", "--", dir, NULL)))
 		goto cleanup;
 
 	/* common-main already logs `argv` */
