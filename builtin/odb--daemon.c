@@ -80,6 +80,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 	struct object_id oid;
 	const char *sz;
 	uintmax_t umax_flags = 0;
+	int want_content = 0;
 	int k;
 
 	// trace2_printf("oid--daemon: received:\n%s", command);
@@ -97,6 +98,11 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 
 		if (skip_prefix(lines[k]->buf, "flags ", &sz)) {
 			umax_flags = strtoumax(sz, NULL, 10);
+			continue;
+		}
+
+		if (skip_prefix(lines[k]->buf, "content ", &sz)) {
+			want_content = (*sz == 't');
 			continue;
 		}
 
@@ -121,9 +127,8 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		var_oi.sizep = &var_size;
 		var_oi.disk_sizep = &var_disk_size;
 		var_oi.delta_base_oid = &var_delta_base_oid;
-		// TODO have the client send another field to indicate
-		// TODO whether it wants the contents or not.
-		var_oi.contentp = &var_content;
+		if (want_content)
+			var_oi.contentp = &var_content;
 
 		ret = oid_object_info_extended(the_repository, &oid, &var_oi,
 					       (unsigned)umax_flags);
@@ -150,10 +155,11 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 
 		/*
 		 * Add one to the length of the headers to include the NUL and
-		 * then immediately send the object contents.
+		 * then (if requested) immediately send the object contents.
 		 */
 		reply_cb(reply_data, response.buf, response.len + 1);
-		reply_cb(reply_data, var_content, var_size);
+		if (want_content)
+			reply_cb(reply_data, var_content, var_size);
 
 		free(var_content);
 	}

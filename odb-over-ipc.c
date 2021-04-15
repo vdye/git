@@ -137,7 +137,7 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	 */
 	strbuf_addf(&cmd, "oid %s\n", oid_to_hex_r(hex_buf, oid));
 	strbuf_addf(&cmd, "flags %"PRIuMAX"\n", (uintmax_t)flags);
-	// TODO send another row to indicate whether we want the content buffer.
+	strbuf_addf(&cmd, "content %c\n", (oi && oi->contentp ? 't' : 'f'));
 
 	ret = odb_over_ipc__command(cmd.buf, &answer);
 
@@ -161,6 +161,7 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	/* Find the divider between the headers and the content. */
 	ch_nul = strchr(answer.buf, '\0');
 	content = ch_nul + 1;
+	/* The content_len is only defined if we asked for content. */
 	content_len = &answer.buf[answer.len] - content;
 
 	/*
@@ -191,10 +192,10 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 
 		if (skip_prefix(lines[k]->buf, "size ", &sz)) {
 			ssize_t size = strtoumax(sz, NULL, 10);
-			assert(size == content_len);
-
 			if (oi->sizep)
 				*(oi->sizep) = size;
+			if (oi->contentp && size != content_len)
+				BUG("observed content length does not match size");
 			continue;
 		}
 
