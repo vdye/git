@@ -57,6 +57,18 @@ struct odb_over_ipc__get_oid__request
 	unsigned want_content:1;
 };
 
+struct odb_over_ipc__get_oid__response
+{
+	struct odb_over_ipc__key key;
+	struct object_id oid;
+	struct object_id delta_base_oid;
+	off_t disk_size;
+	unsigned long size;
+	unsigned whence; /* see struct object_info */
+	enum object_type type;
+	unsigned content_follows:1;
+};
+
 /*
  * Connect to an existing `git odb--daemon` process and ask it for
  * an object.  This is intended to be inserted into the client

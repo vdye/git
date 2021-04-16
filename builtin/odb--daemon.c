@@ -76,7 +76,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 			       struct ipc_server_reply_data *reply_data)
 {
 	struct odb_over_ipc__get_oid__request *req;
-	struct strbuf response = STRBUF_INIT;
+	struct odb_over_ipc__get_oid__response resp;
 
 	if (command_len != sizeof(*req))
 		BUG("incorrect size for binary data");
@@ -87,20 +87,20 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 	// TODO For now, just do the regular lookup.
 
 	{
-		enum object_type var_type = OBJ_BAD;
-		unsigned long var_size = 0;
-		off_t var_disk_size = 0;
-		struct object_id var_delta_base_oid;
 		void *var_content = NULL;
 		struct object_info var_oi = OBJECT_INFO_INIT;
 		int ret;
 
-		oidclr(&var_delta_base_oid);
+		memset(&resp, 0, sizeof(resp));
+		memcpy(resp.key.key, "oid", 4);
+		oidcpy(&resp.oid, &req->oid);
+		oidclr(&resp.delta_base_oid);
 
-		var_oi.typep = &var_type;
-		var_oi.sizep = &var_size;
-		var_oi.disk_sizep = &var_disk_size;
-		var_oi.delta_base_oid = &var_delta_base_oid;
+		var_oi.typep = &resp.type;
+		var_oi.sizep = &resp.size;
+		var_oi.disk_sizep = &resp.disk_size;
+		var_oi.delta_base_oid = &resp.delta_base_oid;
+		/* the client can compute `type_name` from `type`. */
 		if (req->want_content)
 			var_oi.contentp = &var_content;
 
@@ -109,49 +109,30 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		if (ret)
 			goto fail;
 
-		strbuf_reset(&response);
-		strbuf_addf(&response, "oid %s\n", oid_to_hex(&req->oid));
-		strbuf_addf(&response, "type %d\n", var_type);
-		strbuf_addf(&response, "size %"PRIuMAX"\n", (uintmax_t)var_size);
-		strbuf_addf(&response, "disk %"PRIuMAX"\n", (uintmax_t)var_disk_size);
-		if (!is_null_oid(&var_delta_base_oid))
-			strbuf_addf(&response, "delta %s\n", oid_to_hex(&var_delta_base_oid));
 		// TODO should we create a new fake whence value that we report to
 		// TODO the client -- something like "ipc" to indicate that the
 		// TODO client got it from us and therefore doesn't have the in-memory
 		// TODO cache nor any of the packfile data loaded.  The answer to this
 		// TODO also affects the oi.u.packed fields.
-		strbuf_addf(&response, "whence %d\n", var_oi.whence);
+		resp.whence = var_oi.whence;
 
 		// TODO decide if we care about oi.u.packed
 
-		// trace2_printf("oid--daemon: sending:\n%s", response.buf);
-
-		/*
-		 * Add one to the length of the headers to include the NUL and
-		 * then (if requested) immediately send the object contents.
-		 */
-		reply_cb(reply_data, response.buf, response.len + 1);
+		reply_cb(reply_data, (const char *)&resp, sizeof(resp));
 		if (req->want_content)
-			reply_cb(reply_data, var_content, var_size);
+			reply_cb(reply_data, var_content, resp.size);
 
 		free(var_content);
 	}
 
-	goto done;
+	return 0;
 
 fail:
 	/*
 	 * Send the client an error response to force it to do
 	 * the work itself.
 	 */
-	strbuf_reset(&response);
-	strbuf_addstr(&response, "error");
-	reply_cb(reply_data, response.buf, response.len + 1);
-	goto done;
-
-done:
-	strbuf_release(&response);
+	reply_cb(reply_data, "error", 6);
 	return 0;
 }
 
