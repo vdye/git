@@ -11,6 +11,7 @@
 #include "version.h"
 #include "dir.h"
 #include "fsmonitor-ipc.h"
+#include "json-parser.h"
 
 static int run_git(const char *dir, const char *arg, ...)
 {
@@ -382,6 +383,79 @@ static int set_config(const char *file, const char *fmt, ...)
 	return res;
 }
 
+/* Find N for which .CacheServers[N].GlobalDefault == true */
+static int get_cache_server_index(struct json_iterator *it)
+{
+	const char *p;
+	char *q;
+	long l;
+
+	if (it->type == JSON_TRUE &&
+	    skip_iprefix(it->key.buf, ".CacheServers[", &p) &&
+	    (l = strtol(p, &q, 10)) >= 0 && p != q &&
+	    !strcasecmp(q, "].GlobalDefault")) {
+		*(long *)it->fn_data = l;
+		return 1;
+	}
+
+	return 0;
+}
+
+struct cache_server_url_data {
+	char *key, *url;
+};
+
+/* Get .CacheServers[N].Url */
+static int get_cache_server_url(struct json_iterator *it)
+{
+	struct cache_server_url_data *data = it->fn_data;
+
+	if (it->type == JSON_STRING &&
+	    !strcasecmp(data->key, it->key.buf)) {
+		data->url = strbuf_detach(&it->string_value, NULL);
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ * If `cache_server_url` is `NULL`, print the list to `stdout`.
+ */
+static int supports_gvfs_protocol(const char *dir, const char *url,
+				  char **cache_server_url)
+{
+	struct child_process cp = CHILD_PROCESS_INIT;
+	struct strbuf out = STRBUF_INIT;
+
+	cp.git_cmd = 1;
+	cp.dir = dir; /* gvfs-helper requires a Git repository */
+	strvec_pushl(&cp.args, "gvfs-helper", "--remote", url, "config", NULL);
+	if (!pipe_command(&cp, NULL, 0, &out, 512, NULL, 0)) {
+		long l = 0;
+		struct json_iterator it =
+			JSON_ITERATOR_INIT(out.buf, get_cache_server_index, &l);
+		struct cache_server_url_data data = { .url = NULL };
+
+		if (iterate_json(&it) < 0) {
+			strbuf_release(&out);
+			return error("JSON parse error");
+		}
+		data.key = xstrfmt(".CacheServers[%ld].Url", l);
+		it.fn = get_cache_server_url;
+		it.fn_data = &data;
+		if (iterate_json(&it) < 0) {
+			strbuf_release(&out);
+			return error("JSON parse error");
+		}
+		*cache_server_url = data.url;
+		free(data.key);
+		return 1;
+	}
+	strbuf_release(&out);
+	return 0; /* error out quietly */
+}
+
 static char *remote_default_branch(const char *dir, const char *url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
@@ -438,6 +512,7 @@ static int cmd_clone(int argc, const char **argv)
 {
 	char *branch = NULL;
 	int no_fetch_commits_and_trees = 0, full_clone = 0, single_branch = 0;
+	char *cache_server_url = NULL;
 	struct option clone_options[] = {
 		OPT_STRING('b', "branch", &branch, N_("<branch>"),
 			   N_("branch to checkout after clone")),
@@ -449,6 +524,9 @@ static int cmd_clone(int argc, const char **argv)
 		OPT_BOOL(0, "single-branch", &single_branch,
 			 N_("only download metadata for the branch that will "
 			    "be checked out")),
+		OPT_STRING(0, "cache-server-url", &cache_server_url,
+			   N_("<url>"),
+			   N_("the url or friendly name of the cache server")),
 		OPT_END(),
 	};
 	const char * const clone_usage[] = {
@@ -516,12 +594,33 @@ static int cmd_clone(int argc, const char **argv)
 	    set_config(config_path, "remote.origin.fetch="
 		    "+refs/heads/%s:refs/remotes/origin/%s",
 		    single_branch ? branch : "*",
-		    single_branch ? branch : "*") ||
-	    set_config(config_path, "remote.origin.promisor=true") ||
-	    set_config(config_path,
-		       "remote.origin.partialCloneFilter=blob:none")) {
+		    single_branch ? branch : "*")) {
 		res = error(_("could not configure remote in '%s'"), dir);
 		goto cleanup;
+	}
+
+	if (cache_server_url ||
+	    supports_gvfs_protocol(dir, url, &cache_server_url)) {
+		if (set_config(config_path, "core.useGVFSHelper=true") ||
+		    set_config(config_path, "core.gvfs=150")) {
+			res = error(_("could not turn on GVFS helper"));
+			goto cleanup;
+		}
+		if (cache_server_url &&
+		    set_config(config_path,
+			       "gvfs.cache-server=%s", cache_server_url)) {
+			res = error(_("could not configure cache server"));
+			goto cleanup;
+		}
+	} else {
+		if (set_config(config_path, "core.useGVFSHelper=false") ||
+		    set_config(config_path, "remote.origin.promisor=true") ||
+		    set_config(config_path,
+			       "remote.origin.partialCloneFilter=blob:none")) {
+			res = error(_("could not configure partial clone in "
+				      "'%s'"), dir);
+			goto cleanup;
+		}
 	}
 
 	if (!full_clone &&
@@ -574,6 +673,7 @@ static int cmd_diagnose(int argc, const char **argv)
 	time_t now = time(NULL);
 	struct tm tm;
 	struct strbuf path = STRBUF_INIT, buf = STRBUF_INIT;
+	char *cache_server_url = NULL;
 	int res = 0;
 
 	if (argc != 1)
@@ -600,6 +700,10 @@ static int cmd_diagnose(int argc, const char **argv)
 		    git_built_from_commit_string : "(n/a)");
 
 	strbuf_addf(&buf, "Enlistment root: %s\n", the_repository->worktree);
+
+	git_config_get_string("gvfs.cache-server", &cache_server_url);
+	strbuf_addf(&buf, "Cache Server: %s\n\n",
+		    cache_server_url ? cache_server_url : "None");
 	get_disk_info(&buf);
 	fwrite(buf.buf, buf.len, 1, stdout);
 
@@ -628,6 +732,7 @@ diagnose_cleanup:
 	strbuf_release(&tmp_dir);
 	strbuf_release(&path);
 	strbuf_release(&buf);
+	free(cache_server_url);
 
 	return res;
 }
