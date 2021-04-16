@@ -115,8 +115,8 @@ int odb_over_ipc__command(const char *command, size_t command_len,
 int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 			  struct object_info *oi, unsigned flags)
 {
-	char hex_buf[GIT_MAX_HEXSZ + 1];
-	struct strbuf cmd = STRBUF_INIT;
+	struct odb_over_ipc__get_oid__request req;
+
 	struct strbuf answer = STRBUF_INIT;
 	struct strbuf headers = STRBUF_INIT;
 	struct strbuf **lines = NULL;
@@ -133,18 +133,13 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	if (r != the_repository)	// TODO not dealing with this
 		return -1;
 
-	/*
-	 * If we are going to the trouble to ask the daemon for information on
-	 * the object, always get all of the optional fields.  That is, don't
-	 * worry with which fields within `oi` are populated on the request side.
-	 */
-	strbuf_addf(&cmd, "oid %s\n", oid_to_hex_r(hex_buf, oid));
-	strbuf_addf(&cmd, "flags %"PRIuMAX"\n", (uintmax_t)flags);
-	strbuf_addf(&cmd, "content %c\n", (oi && oi->contentp ? 't' : 'f'));
+	memset(&req, 0, sizeof(req));
+	memcpy(req.key.key, "oid", 4);
+	oidcpy(&req.oid, oid);
+	req.flags = flags;
+	req.want_content = (oi && oi->contentp);
 
-	ret = odb_over_ipc__command(cmd.buf, cmd.len, &answer);
-
-	strbuf_release(&cmd);
+	ret = odb_over_ipc__command((const char *)&req, sizeof(req), &answer);
 	if (ret)
 		return ret;
 

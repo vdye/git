@@ -44,6 +44,19 @@ enum ipc_active_state odb_over_ipc__get_state(void);
 int odb_over_ipc__command(const char *command, size_t command_len,
 			  struct strbuf *answer);
 
+struct odb_over_ipc__key
+{
+	char key[16];
+};
+
+struct odb_over_ipc__get_oid__request
+{
+	struct odb_over_ipc__key key;
+	struct object_id oid;
+	unsigned flags;
+	unsigned want_content:1;
+};
+
 /*
  * Connect to an existing `git odb--daemon` process and ask it for
  * an object.  This is intended to be inserted into the client

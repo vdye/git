@@ -75,39 +75,13 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 			       ipc_server_reply_cb *reply_cb,
 			       struct ipc_server_reply_data *reply_data)
 {
-	struct strbuf **lines = strbuf_split_str(command, '\n', 0);
+	struct odb_over_ipc__get_oid__request *req;
 	struct strbuf response = STRBUF_INIT;
-	struct object_id oid;
-	const char *sz;
-	uintmax_t umax_flags = 0;
-	int want_content = 0;
-	int k;
 
-	// trace2_printf("oid--daemon: received:\n%s", command);
+	if (command_len != sizeof(*req))
+		BUG("incorrect size for binary data");
 
-	oidclr(&oid);
-
-	for (k = 0; lines[k]; k++) {
-		strbuf_trim_trailing_newline(lines[k]);
-
-		if (skip_prefix(lines[k]->buf, "oid ", &sz)) {
-			if (get_oid_hex(sz, &oid))
-				goto fail;
-			continue;
-		}
-
-		if (skip_prefix(lines[k]->buf, "flags ", &sz)) {
-			umax_flags = strtoumax(sz, NULL, 10);
-			continue;
-		}
-
-		if (skip_prefix(lines[k]->buf, "content ", &sz)) {
-			want_content = (*sz == 't');
-			continue;
-		}
-
-		BUG("unexpected line '%s' in OID request", lines[k]->buf);
-	}
+	req = (struct odb_over_ipc__get_oid__request *)command;
 
 	// TODO Insert ODB lookup from in-memory database here.
 	// TODO For now, just do the regular lookup.
@@ -127,16 +101,16 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		var_oi.sizep = &var_size;
 		var_oi.disk_sizep = &var_disk_size;
 		var_oi.delta_base_oid = &var_delta_base_oid;
-		if (want_content)
+		if (req->want_content)
 			var_oi.contentp = &var_content;
 
-		ret = oid_object_info_extended(the_repository, &oid, &var_oi,
-					       (unsigned)umax_flags);
+		ret = oid_object_info_extended(the_repository, &req->oid, &var_oi,
+					       req->flags);
 		if (ret)
 			goto fail;
 
 		strbuf_reset(&response);
-		strbuf_addf(&response, "oid %s\n", oid_to_hex(&oid));
+		strbuf_addf(&response, "oid %s\n", oid_to_hex(&req->oid));
 		strbuf_addf(&response, "type %d\n", var_type);
 		strbuf_addf(&response, "size %"PRIuMAX"\n", (uintmax_t)var_size);
 		strbuf_addf(&response, "disk %"PRIuMAX"\n", (uintmax_t)var_disk_size);
@@ -158,7 +132,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		 * then (if requested) immediately send the object contents.
 		 */
 		reply_cb(reply_data, response.buf, response.len + 1);
-		if (want_content)
+		if (req->want_content)
 			reply_cb(reply_data, var_content, var_size);
 
 		free(var_content);
@@ -177,8 +151,6 @@ fail:
 	goto done;
 
 done:
-	if (lines)
-		strbuf_list_free(lines);
 	strbuf_release(&response);
 	return 0;
 }
@@ -224,7 +196,7 @@ static int odb_ipc_cb(void *data,
 		return SIMPLE_IPC_QUIT;
 	}
 
-	if (!strncmp(command, "oid", 3)) {
+	if (!strcmp(command, "oid")) {
 		/*
 		 * A client has requested that we lookup an object from the
 		 * ODB and send it to them.
