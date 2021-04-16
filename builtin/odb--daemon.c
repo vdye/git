@@ -1,6 +1,7 @@
 #include "builtin.h"
 #include "config.h"
 #include "object-store.h"
+#include "oidmap.h"
 #include "parse-options.h"
 #include "simple-ipc.h"
 #include "strbuf.h"
@@ -70,39 +71,53 @@ struct my_odb_ipc_state
 
 static struct my_odb_ipc_state my_state;
 
+struct my_oidmap_entry
+{
+	struct oidmap_entry entry;
+	struct odb_over_ipc__get_oid__response resp;
+	char *content;
+};
+
+static struct oidmap my_oidmap = OIDMAP_INIT;
+
+
 static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 			       const char *command, size_t command_len,
 			       ipc_server_reply_cb *reply_cb,
 			       struct ipc_server_reply_data *reply_data)
 {
 	struct odb_over_ipc__get_oid__request *req;
-	struct odb_over_ipc__get_oid__response resp;
+	struct my_oidmap_entry *e;
 
 	if (command_len != sizeof(*req))
 		BUG("incorrect size for binary data");
 
 	req = (struct odb_over_ipc__get_oid__request *)command;
 
-	// TODO Insert ODB lookup from in-memory database here.
-	// TODO For now, just do the regular lookup.
-
-	{
-		void *var_content = NULL;
+	e = oidmap_get(&my_oidmap, &req->oid);
+//	{
+//		char hexbuf[200];
+//		trace2_printf("get-oid: %s %s", oid_to_hex_r(hexbuf, &req->oid),
+//			      (e ? "found" : "not-found"));
+//	}
+	if (!e) {
 		struct object_info var_oi = OBJECT_INFO_INIT;
 		int ret;
 
-		memset(&resp, 0, sizeof(resp));
-		memcpy(resp.key.key, "oid", 4);
-		oidcpy(&resp.oid, &req->oid);
-		oidclr(&resp.delta_base_oid);
+		e = xcalloc(1, sizeof(*e));
 
-		var_oi.typep = &resp.type;
-		var_oi.sizep = &resp.size;
-		var_oi.disk_sizep = &resp.disk_size;
-		var_oi.delta_base_oid = &resp.delta_base_oid;
+		memcpy(e->resp.key.key, "oid", 4);
+		oidcpy(&e->resp.oid, &req->oid);
+		oidclr(&e->resp.delta_base_oid);
+
+		var_oi.typep = &e->resp.type;
+		var_oi.sizep = &e->resp.size;
+		var_oi.disk_sizep = &e->resp.disk_size;
+		var_oi.delta_base_oid = &e->resp.delta_base_oid;
 		/* the client can compute `type_name` from `type`. */
-		if (req->want_content)
-			var_oi.contentp = &var_content;
+
+		/* always fetch the content so that our oidmap cache is complete. */
+		var_oi.contentp = &e->content;
 
 		ret = oid_object_info_extended(the_repository, &req->oid, &var_oi,
 					       req->flags);
@@ -114,16 +129,17 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		// TODO client got it from us and therefore doesn't have the in-memory
 		// TODO cache nor any of the packfile data loaded.  The answer to this
 		// TODO also affects the oi.u.packed fields.
-		resp.whence = var_oi.whence;
+		e->resp.whence = var_oi.whence;
 
 		// TODO decide if we care about oi.u.packed
 
-		reply_cb(reply_data, (const char *)&resp, sizeof(resp));
-		if (req->want_content)
-			reply_cb(reply_data, var_content, resp.size);
-
-		free(var_content);
+		oidcpy(&e->entry.oid, &req->oid);
+		oidmap_put(&my_oidmap, e);
 	}
+
+	reply_cb(reply_data, (const char *)&e->resp, sizeof(e->resp));
+	if (req->want_content)
+		reply_cb(reply_data, e->content, e->resp.size);
 
 	return 0;
 
@@ -226,6 +242,8 @@ static int do_run_daemon(void)
 	int ret;
 
 	odb_over_ipc__set_is_daemon();
+
+	oidmap_init(&my_oidmap, 1024 * 1024);
 
 	// TODO Create mutexes and locks
 	//

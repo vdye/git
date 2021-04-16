@@ -66,7 +66,6 @@ struct odb_over_ipc__get_oid__response
 	unsigned long size;
 	unsigned whence; /* see struct object_info */
 	enum object_type type;
-	unsigned content_follows:1;
 };
 
 /*
