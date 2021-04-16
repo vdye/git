@@ -117,7 +117,7 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 		/* the client can compute `type_name` from `type`. */
 
 		/* always fetch the content so that our oidmap cache is complete. */
-		var_oi.contentp = &e->content;
+		var_oi.contentp = (void **)&e->content;
 
 		ret = oid_object_info_extended(the_repository, &req->oid, &var_oi,
 					       req->flags);
