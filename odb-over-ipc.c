@@ -112,6 +112,17 @@ int odb_over_ipc__command(const char *command, size_t command_len,
 	return 0;
 }
 
+/*
+ * When we request an object from the daemon over IPC, the response
+ * contains both the response-header and the content of the object in
+ * one buffer.  We want to pre-alloc the strbuf-buffer big enough to
+ * avoid multiple realloc's when we are receiving large blobs.
+ *
+ * IPC uses pkt-line and will handle the chunking and reassembly, so
+ * we are not limited to LARGE_PACKET_DATA_MAX buffers.
+ */
+#define LARGE_ANSWER (64 * 1024)
+
 int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 			  struct object_info *oi, unsigned flags)
 {
@@ -134,6 +145,8 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	oidcpy(&req.oid, oid);
 	req.flags = flags;
 	req.want_content = (oi && oi->contentp);
+
+	strbuf_init(&answer, LARGE_ANSWER);
 
 	ret = odb_over_ipc__command((const char *)&req, sizeof(req), &answer);
 	if (ret)
