@@ -70,7 +70,8 @@ void odb_over_ipc__shutdown_keepalive_connection(void)
 	my_ipc_available = 1;
 }
 
-int odb_over_ipc__command(const char *command, struct strbuf *answer)
+int odb_over_ipc__command(const char *command, size_t command_len,
+			  struct strbuf *answer)
 {
 	int ret;
 
@@ -97,7 +98,9 @@ int odb_over_ipc__command(const char *command, struct strbuf *answer)
 
 	strbuf_reset(answer);
 
-	ret = ipc_client_send_command_to_connection(my_ipc_connection, command, answer);
+	ret = ipc_client_send_command_to_connection(my_ipc_connection,
+						    command, command_len,
+						    answer);
 
 	if (ret == -1) {
 		error("could not send '%s' command to odb--daemon", command);
@@ -139,7 +142,7 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	strbuf_addf(&cmd, "flags %"PRIuMAX"\n", (uintmax_t)flags);
 	strbuf_addf(&cmd, "content %c\n", (oi && oi->contentp ? 't' : 'f'));
 
-	ret = odb_over_ipc__command(cmd.buf, &answer);
+	ret = odb_over_ipc__command(cmd.buf, cmd.len, &answer);
 
 	strbuf_release(&cmd);
 	if (ret)

@@ -71,7 +71,7 @@ struct my_odb_ipc_state
 static struct my_odb_ipc_state my_state;
 
 static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
-			       const char *command,
+			       const char *command, size_t command_len,
 			       ipc_server_reply_cb *reply_cb,
 			       struct ipc_server_reply_data *reply_data)
 {
@@ -194,10 +194,17 @@ done:
  */
 static ipc_server_application_cb odb_ipc_cb;
 
-static int odb_ipc_cb(void *data, const char *command,
+static int odb_ipc_cb(void *data,
+		      const char *command, size_t command_len,
 		      ipc_server_reply_cb *reply_cb,
 		      struct ipc_server_reply_data *reply_data)
 {
+	// TODO I did not take time to ensure that `command_len` is
+	// TODO large enough to do all of the strcmp() and starts_with()
+	// TODO calculations when I converted the IPC API to take
+	// TODO `command, command_len` rather than just `command`.
+	// TODO So some cleanup is needed here.
+
 	struct my_odb_ipc_state *state = data;
 	int ret;
 
@@ -223,7 +230,8 @@ static int odb_ipc_cb(void *data, const char *command,
 		 * ODB and send it to them.
 		 */
 		trace2_region_enter("odb-daemon", "get-oid", NULL);
-		ret = odb_ipc_cb__get_oid(state, command, reply_cb, reply_data);
+		ret = odb_ipc_cb__get_oid(state, command, command_len,
+					  reply_cb, reply_data);
 		trace2_region_leave("odb-daemon", "get-oid", NULL);
 
 		return ret;
@@ -311,7 +319,7 @@ static int client_send_stop(void)
 	struct strbuf answer = STRBUF_INIT;
 	int ret;
 
-	ret = odb_over_ipc__command("quit", &answer);
+	ret = odb_over_ipc__command("quit", 4, &answer);
 
 	/* The quit command does not return any response data. */
 	strbuf_release(&answer);

@@ -41,7 +41,8 @@ enum ipc_active_state odb_over_ipc__get_state(void);
  * TODO For simplicit during prototyping I am NOT going to
  * TODO auto-start one.  Revisit this later.
  */
-int odb_over_ipc__command(const char *command, struct strbuf *answer);
+int odb_over_ipc__command(const char *command, size_t command_len,
+			  struct strbuf *answer);
 
 /*
  * Connect to an existing `git odb--daemon` process and ask it for

@@ -131,6 +131,12 @@ static int app__sendbytes_command(const char *received, size_t received_len,
 	if (received_len < strlen("sendbytes "))
 		BUG("received_len is short in app__sendbytes_command");
 
+	// TODO I did not take time to ensure that `received_len` is
+	// TODO large enough to do all of the skip_prefix()
+	// TODO calculations when I converted the IPC API to take
+	// TODO `received, received_len` rather than just `received`.
+	// TODO So some cleanup is needed here.
+
 	if (skip_prefix(received, "sendbytes ", &p))
 		len_ballast = strlen(p);
 
@@ -172,6 +178,12 @@ static int test_app_cb(void *application_data,
 		       ipc_server_reply_cb *reply_cb,
 		       struct ipc_server_reply_data *reply_data)
 {
+	// TODO I did not take time to ensure that `command_len` is
+	// TODO large enough to do all of the strcmp() and starts_with()
+	// TODO calculations when I converted the IPC API to take
+	// TODO `command, command_len` rather than just `command`.
+	// TODO So some cleanup is needed here.
+
 	/*
 	 * Verify that we received the application-data that we passed
 	 * when we started the ipc-server.  (We have several layers of
@@ -600,7 +612,9 @@ static int client__keepalive(void)
 		return error("failed to connect to '%s'", cl_args.path);
 
 	for (k = 0; k < 10; k++) {
-		ret = ipc_client_send_command_to_connection(connection, "ping", &answer);
+		ret = ipc_client_send_command_to_connection(connection,
+							    "ping", 4,
+							    &answer);
 		if (ret) {
 			error("failed to send ping[%d]", k);
 			goto cleanup;
