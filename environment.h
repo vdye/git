@@ -154,6 +154,8 @@ extern int core_apply_sparse_checkout;
 extern int core_sparse_checkout_cone;
 extern int sparse_expect_files_outside_of_patterns;
 
+extern int core_use_odb_over_ipc;
+
 /*
  * Returns the boolean value of $GIT_OPTIONAL_LOCKS (or the default value).
  */

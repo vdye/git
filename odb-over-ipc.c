@@ -1,4 +1,5 @@
 #include "git-compat-util.h"
+#include "environment.h"
 #include "path.h"
 #include "hex.h"
 #include "object.h"
@@ -135,6 +136,9 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	int ret;
 
 	if (is_daemon)
+		return -1;
+
+	if (!core_use_odb_over_ipc)
 		return -1;
 
 	if (r != the_repository)	// TODO not dealing with this
