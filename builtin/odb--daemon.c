@@ -264,6 +264,7 @@ static int do_run_daemon(void)
 	odb_over_ipc__set_is_daemon();
 
 	oidmap_init(&my_oidmap, 1024 * 1024);
+	hashmap_disable_item_counting(&my_oidmap.map);
 
 	// TODO Create mutexes and locks
 	//
