@@ -80,6 +80,37 @@ struct my_oidmap_entry
 
 static struct oidmap my_oidmap = OIDMAP_INIT;
 
+static int do_oid_lookup(struct my_oidmap_entry *e,
+			 struct odb_over_ipc__get_oid__request *req)
+{
+	struct object_info var_oi = OBJECT_INFO_INIT;
+	int ret;
+
+	var_oi.typep = &e->resp.type;
+	var_oi.sizep = &e->resp.size;
+	var_oi.disk_sizep = &e->resp.disk_size;
+	var_oi.delta_base_oid = &e->resp.delta_base_oid;
+	/* the client can compute `type_name` from `type`. */
+
+	if (req->want_content)
+		var_oi.contentp = (void **)&e->content;
+
+	ret = oid_object_info_extended(the_repository, &req->oid, &var_oi,
+				       req->flags);
+	if (ret)
+		return -1;
+
+	// TODO should we create a new fake whence value that we report to
+	// TODO the client -- something like "ipc" to indicate that the
+	// TODO client got it from us and therefore doesn't have the in-memory
+	// TODO cache nor any of the packfile data loaded.  The answer to this
+	// TODO also affects the oi.u.packed fields.
+	e->resp.whence = var_oi.whence;
+
+	// TODO decide if we care about oi.u.packed
+
+	return 0;
+}
 
 static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 			       const char *command, size_t command_len,
@@ -100,38 +131,27 @@ static int odb_ipc_cb__get_oid(struct my_odb_ipc_state *state,
 //		trace2_printf("get-oid: %s %s", oid_to_hex_r(hexbuf, &req->oid),
 //			      (e ? "found" : "not-found"));
 //	}
-	if (!e) {
-		struct object_info var_oi = OBJECT_INFO_INIT;
-		int ret;
 
+	if (e && req->want_content && !e->content) {
+		/*
+		 * We have a cached entry from a previous request where
+		 * the client did not want the content, but this client
+		 * does want the content.  So repeat the lookup and ammend
+		 * our cache entry.
+		 */
+		if (do_oid_lookup(e, req))
+			goto fail;
+	}
+
+	if (!e) {
 		e = xcalloc(1, sizeof(*e));
 
 		memcpy(e->resp.key.key, "oid", 4);
 		oidcpy(&e->resp.oid, &req->oid);
 		oidclr(&e->resp.delta_base_oid);
 
-		var_oi.typep = &e->resp.type;
-		var_oi.sizep = &e->resp.size;
-		var_oi.disk_sizep = &e->resp.disk_size;
-		var_oi.delta_base_oid = &e->resp.delta_base_oid;
-		/* the client can compute `type_name` from `type`. */
-
-		/* always fetch the content so that our oidmap cache is complete. */
-		var_oi.contentp = (void **)&e->content;
-
-		ret = oid_object_info_extended(the_repository, &req->oid, &var_oi,
-					       req->flags);
-		if (ret)
+		if (do_oid_lookup(e, req))
 			goto fail;
-
-		// TODO should we create a new fake whence value that we report to
-		// TODO the client -- something like "ipc" to indicate that the
-		// TODO client got it from us and therefore doesn't have the in-memory
-		// TODO cache nor any of the packfile data loaded.  The answer to this
-		// TODO also affects the oi.u.packed fields.
-		e->resp.whence = var_oi.whence;
-
-		// TODO decide if we care about oi.u.packed
 
 		oidcpy(&e->entry.oid, &req->oid);
 		oidmap_put(&my_oidmap, e);
