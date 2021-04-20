@@ -176,7 +176,7 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 	content = answer.buf + sizeof(*resp);
 	content_len = answer.len - sizeof(*resp);
 
-	if (oidcmp(&resp->oid, oid)) {
+	if (!oideq(&resp->oid, oid)) {
 		// TODO Think about the _LOOKUP_REPLACE code here
 		BUG("received different OID");
 	}
