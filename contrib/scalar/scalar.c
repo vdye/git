@@ -953,6 +953,57 @@ static int cmd_unregister(int argc, const char **argv)
 	return unregister_dir(argc < 2 ? NULL : argv[1]);
 }
 
+static int cmd_cache_server(int argc, const char **argv)
+{
+	enum {
+		GET, SET, LIST
+	} mode = GET;
+	struct option cache_server_options[] = {
+		OPT_CMDMODE(0, "get", &mode,
+			    N_("get the configured cache-server URL"), GET),
+		OPT_CMDMODE(0, "set", &mode,
+			    N_("set the configured cache-server URL"), SET),
+		OPT_CMDMODE(0, "list", &mode,
+			    N_("list the possible cache-server URLs"), LIST),
+		OPT_END(),
+	};
+	const char * const cache_server_usage[] = {
+		N_("scalar cache_server "
+		   "[--get | --set <url> | --list [<remote>]]"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, cache_server_options,
+			     cache_server_usage, 0);
+
+
+	if (mode == LIST) {
+		if (argc > 1)
+			usage_with_options(cache_server_usage,
+					   cache_server_options);
+		return !!supports_gvfs_protocol(NULL, argc > 0 ?
+						argv[0] : "origin", NULL);
+	} else if (mode == SET) {
+		if (argc != 1)
+			usage_with_options(cache_server_usage,
+					   cache_server_options);
+		return !!set_config(NULL, "gvfs.cache-server=%s", argv[0]);
+	} else {
+		char *url = NULL;
+
+		if (argc != 0)
+			usage_with_options(cache_server_usage,
+					   cache_server_options);
+
+		printf("Using cache server: %s\n",
+		       git_config_get_string("gvfs.cache-server", &url) ?
+		       "(undefined)" : url);
+		free(url);
+	}
+
+	return 0;
+}
+
 struct {
 	const char *name;
 	int (*fn)(int, const char **);
@@ -964,6 +1015,7 @@ struct {
 	{ "unregister", cmd_unregister, 1 },
 	{ "run", cmd_run, 1 },
 	{ "diagnose", cmd_diagnose, 1 },
+	{ "cache-server", cmd_cache_server, 1 },
 	{ NULL, NULL},
 };
 
