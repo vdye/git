@@ -8,7 +8,9 @@ scalar - an opinionated repository management tool
 SYNOPSIS
 --------
 [verse]
-scalar <command> [<options>]
+scalar clone [--single-branch] [--branch <main-branch>] [--full-clone]
+         [--no-fetch-commits-and-trees] [--local-cache-path <path>]
+         [--cache-server-url <url>] <url> [<directory>]
 
 DESCRIPTION
 -----------
@@ -32,6 +34,60 @@ The following options can be specified _before_ the subcommand:
 -c <key>=<value>::
     For the duration of running the specified subcommand, configure this
     setting. This option imitates the same option of linkgit:git[1].
+
+COMMANDS
+--------
+
+Clone
+~~~~~
+
+clone [<options>] <url> [<directory>]::
+    Clones the specified repository, similar to linkgit:git-clone[1]. By
+    default, only commit and tree objects are cloned. Once finished, the
+    worktree is located at `<directory>/src`.
++
+The sparse-checkout feature is enabled (except when run with `--full-clone`)
+and the only files present are those in the top-level directory. Use
+`git sparse-checkout set` to expand the set of directories you want to see,
+or `git sparse-checkout disable` to expand to all files (see
+linkgit:git-sparse-checkout[1] for more details). You can explore the
+subdirectories outside your sparse-checkout by using `git ls-tree HEAD`.
+
+-b <name>::
+--branch <name>::
+	Instead of checking out the branch pointed to by the cloned repository's
+    HEAD, check out the `<name>` branch instead.
+
+--[no-]single-branch::
+	Clone only the history leading to the tip of a single branch,
+	either specified by the `--branch` option or the primary
+	branch remote's `HEAD` points at.
+	Further fetches into the resulting repository will only update the
+	remote-tracking branch for the branch this option was used for the
+	initial cloning.  If the HEAD at the remote did not point at any
+	branch when `--single-branch` clone was made, no remote-tracking
+	branch is created.
+
+--[no-]full-clone::
+    A sparse-checkout is initialized by default. This behavior can be turned
+    off via `--no-full-clone`.
+
+--[no-]fetch-commits-and-trees::
+    The default behavior is to clone all commit and tree objects, with blob
+    objects being fetched on demand. With the `--no-fetch-commits-and-trees`
+    option, commit and tree objects are also fetched only as needed.
+
+--local-cache-path <path>::
+    Override the path to the local cache root directory; Pre-fetched objects
+    are stored into a repository-dependent subdirectory of that path.
++
+The default is `<drive>:\.scalarCache` on Windows (on the same drive as the
+clone), and `~/.scalarCache` on macOS.
+
+--cache-server-url <url>::
+    Retrieve missing objects from the specified remote, which is expected to
+    understand the GVFS protocol.
+
 
 SEE ALSO
 --------
