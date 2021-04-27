@@ -11,6 +11,9 @@ SYNOPSIS
 scalar clone [--single-branch] [--branch <main-branch>] [--full-clone]
          [--no-fetch-commits-and-trees] [--local-cache-path <path>]
          [--cache-server-url <url>] <url> [<directory>]
+scalar list
+scalar register
+scalar unregister
 
 DESCRIPTION
 -----------
@@ -87,6 +90,29 @@ clone), and `~/.scalarCache` on macOS.
 --cache-server-url <url>::
     Retrieve missing objects from the specified remote, which is expected to
     understand the GVFS protocol.
+
+List
+~~~~
+
+list::
+    To see which repositories are currently registered by the service, run
+    `scalar list`. This command, like `clone`, does not need to be run
+    inside a Git worktree.
+
+Register
+~~~~~~~~
+
+register [<path>]::
+    Adds a repository to the list of registered repositories. If `<path>`
+    is not provided, then the repository associated with the current
+    directory is registered.
+
+Unregister
+~~~~~~~~~~
+
+unregister [<path>]::
+    Remove the specified repository from the list of repositories
+    registered with Scalar.
 
 
 SEE ALSO
