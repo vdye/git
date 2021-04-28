@@ -547,14 +547,16 @@ static int cmd_diagnose(int argc, const char **argv)
 	if (argc != 1)
 		die("'scalar diagnose' does not accept any arguments");
 
-	strbuf_addstr(&tmp_dir, "../.scalarDiagnostics/scalar_");
-	strbuf_addftime(&tmp_dir, "%Y%m%d_%H%M%S",
+	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
+	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
 			localtime_r(&now, &tm), 0, 0);
 	if (run_git(NULL, "init", "-q", "-b", "dummy",
-		    "--bare", tmp_dir.buf, NULL)) {
-		res = error(_("could not initialize temporary repository"));
+		    "--bare", buf.buf, NULL)) {
+		res = error(_("could not initialize temporary repository: %s"),
+			    buf.buf);
 		goto diagnose_cleanup;
 	}
+	strbuf_realpath(&tmp_dir, buf.buf, 1);
 
 	strbuf_reset(&buf);
 	strbuf_addf(&buf, "Collecting diagnostic info into temp folder %s\n\n",
