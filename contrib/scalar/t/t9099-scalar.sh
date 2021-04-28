@@ -10,6 +10,9 @@ PATH=$(pwd)/..:$PATH
 
 . ../../../t/test-lib.sh
 
+GIT_TEST_MAINT_SCHEDULER="crontab:test-tool crontab ../cron.txt"
+export GIT_TEST_MAINT_SCHEDULER
+
 test_expect_success 'scalar shows a usage' '
 	test_expect_code 129 scalar -h
 '
@@ -30,6 +33,9 @@ test_expect_success 'scalar clone' '
 	scalar clone "file://$(pwd)" cloned --single-branch &&
 	(
 		cd cloned/src &&
+
+		git config --get --global --fixed-value maintenance.repo \
+			"$(pwd)" &&
 
 		git for-each-ref --format="%(refname)" refs/remotes/origin/ >actual &&
 		echo "refs/remotes/origin/parallel" >expect &&
