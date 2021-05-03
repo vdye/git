@@ -1,0 +1,42 @@
+scalar(1)
+=========
+
+NAME
+----
+scalar - an opinionated repository management tool
+
+SYNOPSIS
+--------
+[verse]
+scalar <command> [<options>]
+
+DESCRIPTION
+-----------
+
+Scalar is an opinionated repository management tool. By creating new
+repositories or registering existing repositories with Scalar, your Git
+experience will speed up. Scalar sets advanced Git config settings,
+maintains your repositories in the background, and helps reduce data sent
+across the network.
+
+The command implements various subcommands, and different options depending
+on the subcommand. With the exception of `clone` and `list`, all subcommands
+expect to be run in a Git worktree.
+
+The following options can be specified _before_ the subcommand:
+
+-C <directory>::
+    Before running the subcommand, change the working directory. This
+    option imitates the same option of linkgit:git[1].
+
+-c <key>=<value>::
+    For the duration of running the specified subcommand, configure this
+    setting. This option imitates the same option of linkgit:git[1].
+
+SEE ALSO
+--------
+linkgit:git-clone[1], linkgit:git-maintenance[1].
+
+Scalar
+---
+Associated with the linkgit:git[1] suite
