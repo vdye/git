@@ -13,6 +13,10 @@ PATH=$(pwd)/..:$PATH
 GIT_TEST_MAINT_SCHEDULER="crontab:test-tool crontab ../cron.txt"
 export GIT_TEST_MAINT_SCHEDULER
 
+# Do not write any files outside the trash directory
+Scalar_UNATTENDED=1
+export Scalar_UNATTENDED
+
 test_expect_success 'scalar shows a usage' '
 	test_expect_code 129 scalar -h
 '
@@ -127,6 +131,14 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 	: the fake cache server requires fake authentication &&
 	git config --global core.askPass true &&
 	scalar clone --single-branch -- http://$HOST_PORT/ using-gvfs &&
+
+	: verify that the shared cache has been configured &&
+	cache_key="url_$(printf "%s" http://$HOST_PORT/ |
+		tr A-Z a-z |
+		test-tool sha1)" &&
+	echo "$(pwd)/using-gvfs/.scalarCache/$cache_key" >expect &&
+	git -C using-gvfs/src config gvfs.sharedCache >actual &&
+	test_cmp expect actual &&
 
 	second=$(git rev-parse --verify second:second.t) &&
 	(
