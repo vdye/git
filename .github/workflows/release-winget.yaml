@@ -33,7 +33,7 @@ jobs:
             InstallerType: inno
             InstallerSha256: {{sha256}}
             InstallerSwitches:
-              Custom: "/AUTOUPDATE"
+              Custom: /COMPONENTS="AUTOUPDATE"
           PackageLocale: en-US
           ManifestType: singleton
           ManifestVersion: 1.0.0
