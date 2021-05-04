@@ -13,7 +13,7 @@ jobs:
       with:
         id: Microsoft.Git
         token: ${{ secrets.WINGET_TOKEN }}
-        releaseAsset: Git-\[0-9.vfs]*\-64-bit.exe
+        releaseAsset: Git-([0-9.vfs]*)\-64-bit.exe
         manifestText: |
           PackageIdentifier: {{id}}
           PackageVersion: {{version}}
@@ -21,7 +21,7 @@ jobs:
           Publisher: Microsoft Corporation
           Moniker: microsoft-git
           PackageUrl: https://aka.ms/ms-git
-          Tags: [ microsoft/git ]
+          Tags: [ microsoft-git ]
           License: Copyright (C) Microsoft Corporation
           ShortDescription: |
             Git distribution to support monorepo scenarios.
