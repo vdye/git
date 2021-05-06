@@ -1023,7 +1023,7 @@ static int cmd_cache_server(int argc, const char **argv)
 	int get = 0;
 	char *set = NULL, *list = NULL;
 	const char *default_remote = "(default)";
-	struct option cache_server_options[] = {
+	struct option options[] = {
 		OPT_BOOL(0, "get", &get,
 			 N_("get the configured cache-server URL")),
 		OPT_STRING(0, "set", &set, N_("URL"),
@@ -1033,25 +1033,25 @@ static int cmd_cache_server(int argc, const char **argv)
 		  PARSE_OPT_OPTARG, NULL, (intptr_t) default_remote },
 		OPT_END(),
 	};
-	const char * const cache_server_usage[] = {
+	const char * const usage[] = {
 		N_("scalar cache_server "
 		   "[--get | --set <url> | --list [<remote>]] [<worktree>]"),
 		NULL
 	};
 	int res = 0;
 
-	argc = parse_options(argc, argv, NULL, cache_server_options,
-			     cache_server_usage, 0);
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
 
 	if (get + !!set + !!list > 1)
 		usage_msg_opt(_("--get/--set/--list are mutually exclusive"),
-			      cache_server_usage, cache_server_options);
+			      usage, options);
 
 	if (argc == 1) {
 		if (chdir(argv[0]) < 0)
 			die(_("could not switch to '%s'"), argv[0]);
 	} else if (argc > 0)
-		usage_with_options(cache_server_usage, cache_server_options);
+		usage_with_options(usage, options);
 
 	setup_git_directory();
 
