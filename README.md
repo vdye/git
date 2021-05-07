@@ -24,7 +24,7 @@ download the latest version installer for your OS from the [Releases page](https
 you can opt to install via the command line, using the below instructions for supported OSes:
 
 ## Windows
-__Note:__ Winget is still in public preview, meaning you currently [need to take special installation steps](https://docs.microsoft.com/en-us/windows/package-manager/winget/#install-winget).
+__Note:__ Winget is still in public preview, meaning you currently [need to take special installation steps](https://docs.microsoft.com/en-us/windows/package-manager/winget/#install-winget) (i.e. manually installing the `.appxbundle`, installing the preview version of [App Installer](https://www.microsoft.com/p/app-installer/9nblggh4nns1?ocid=9nblggh4nns1_ORSEARCH_Bing&rtc=1&activetab=pivot:overviewtab), or participating in the [Windows Insider flight ring](https://insider.windows.com/https://insider.windows.com/)).
 
 To install with Winget, run
 
@@ -63,7 +63,7 @@ Or you can run the `git update-microsoft-git` command, which will run those brew
 For Ubuntu/Debian distributions, `apt-get` support is coming soon. For now, though, please use the most recent [`.deb` package](https://github.com/microsoft/git/releases).
 
 ```shell
-wget https://github.com/microsoft/git/releases/download/v2.31.1.vfs.0.1/git-vfs_2.31.1.vfs.0.1.deb microsoft-git.deb
+wget -o microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.31.1.vfs.0.1/git-vfs_2.31.1.vfs.0.1.deb
 sudo dpkg -i microsoft-git.deb
 ```
 
