@@ -1122,7 +1122,7 @@ static int cmd_cache_server(int argc, const char **argv)
 	};
 	const char * const usage[] = {
 		N_("scalar cache_server "
-		   "[--get | --set <url> | --list [<remote>]] [<worktree>]"),
+		   "[--get | --set <url> | --list [<remote>]] [<enlistment>]"),
 		NULL
 	};
 	int res = 0;
@@ -1134,13 +1134,7 @@ static int cmd_cache_server(int argc, const char **argv)
 		usage_msg_opt(_("--get/--set/--list are mutually exclusive"),
 			      usage, options);
 
-	if (argc == 1) {
-		if (chdir(argv[0]) < 0)
-			die(_("could not switch to '%s'"), argv[0]);
-	} else if (argc > 0)
-		usage_with_options(usage, options);
-
-	setup_git_directory();
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	if (list) {
 		const char *name = list, *url = list;
