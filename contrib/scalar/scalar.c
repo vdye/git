@@ -1026,6 +1026,9 @@ static int cmd_register(int argc, const char **argv)
 
 static int cmd_run(int argc, const char **argv)
 {
+	struct option options[] = {
+		OPT_END(),
+	};
 	struct {
 		const char *arg, *task;
 	} tasks[] = {
@@ -1036,40 +1039,52 @@ static int cmd_run(int argc, const char **argv)
 		{ "pack-files", "incremental-repack" },
 		{ NULL, NULL }
 	};
-
-	struct strbuf usage = STRBUF_INIT;
+	struct strbuf buf = STRBUF_INIT;
+	const char *usagestr[] = { NULL, NULL };
 	int i;
 
-	if (argc == 2) {
-		if (!strcmp("config", argv[1]))
-			return register_dir(NULL);
+	strbuf_addstr(&buf, N_("scalar run <task> [<enlistment>]\nTasks:\n"));
+	for (i = 0; tasks[i].arg; i++)
+		strbuf_addf(&buf, "\t%s\n", tasks[i].arg);
+	usagestr[0] = buf.buf;
 
-		if (!strcmp("all", argv[1])) {
-			if (register_dir(NULL))
-				return -1;
-			for (i = 0; tasks[i].arg; i++)
-				if (tasks[i].task &&
-				    run_git(NULL, "maintenance", "run",
-					    "--task", tasks[i].task, NULL))
-					return -1;
-			return 0;
+	argc = parse_options(argc, argv, NULL, options,
+			     usagestr, 0);
+
+	if (argc == 0)
+		usage_with_options(usagestr, options);
+
+	if (!strcmp("all", argv[0]))
+		i = -1;
+	else {
+		for (i = 0; tasks[i].arg && strcmp(tasks[i].arg, argv[0]); i++)
+			; /* keep looking for the task */
+
+		if (i > 0 && !tasks[i].arg) {
+			error(_("no such task: '%s'"), argv[0]);
+			usage_with_options(usagestr, options);
 		}
-
-		for (i = 0; tasks[i].arg; i++)
-			if (!strcmp(tasks[i].arg, argv[1]))
-				return run_git(NULL, "maintenance", "run",
-					       "--task", tasks[i].task, NULL);
-		error(_("no such task: '%s'"), argv[1]);
 	}
 
-	strbuf_addstr(&usage, N_("scalar run <task>\nTasks:\n"));
-	for (i = 0; tasks[i].arg; i++)
-		strbuf_addf(&usage, "\t%s\n", tasks[i].arg);
+	argc--;
+	argv++;
+	setup_enlistment_directory(argc, argv, usagestr, options);
+	strbuf_release(&buf);
 
-	fwrite(usage.buf, usage.len, 1, stderr);
-	strbuf_release(&usage);
+	if (i == 0)
+		return register_dir(NULL);
 
-	return -1;
+	if (i > 0)
+		return run_git(NULL, "maintenance", "run",
+			       "--task", tasks[i].task, NULL);
+
+	if (register_dir(NULL))
+		return -1;
+	for (i = 1; tasks[i].arg; i++)
+		if (run_git(NULL, "maintenance", "run",
+			    "--task", tasks[i].task, NULL))
+			return -1;
+	return 0;
 }
 
 static int cmd_unregister(int argc, const char **argv)
@@ -1188,7 +1203,7 @@ struct {
 	{ "list", cmd_list, 0 },
 	{ "register", cmd_register, 0 },
 	{ "unregister", cmd_unregister, 0 },
-	{ "run", cmd_run, 1 },
+	{ "run", cmd_run, 0 },
 	{ "diagnose", cmd_diagnose, 1 },
 	{ "cache-server", cmd_cache_server, 0 },
 	{ "test", cmd_test, 0 },
