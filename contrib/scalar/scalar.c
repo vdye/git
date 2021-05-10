@@ -915,6 +915,13 @@ cleanup:
 
 static int cmd_diagnose(int argc, const char **argv)
 {
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar diagnose [<enlistment>]"),
+		NULL
+	};
 	struct strbuf tmp_dir = STRBUF_INIT;
 	time_t now = time(NULL);
 	struct tm tm;
@@ -922,8 +929,10 @@ static int cmd_diagnose(int argc, const char **argv)
 	char *cache_server_url = NULL, *shared_cache = NULL;
 	int res = 0;
 
-	if (argc != 1)
-		die("'scalar diagnose' does not accept any arguments");
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
 	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
@@ -1198,7 +1207,7 @@ struct {
 	{ "register", cmd_register, 0 },
 	{ "unregister", cmd_unregister, 0 },
 	{ "run", cmd_run, 0 },
-	{ "diagnose", cmd_diagnose, 1 },
+	{ "diagnose", cmd_diagnose, 0 },
 	{ "cache-server", cmd_cache_server, 0 },
 	{ "test", cmd_test, 0 },
 	{ NULL, NULL},
