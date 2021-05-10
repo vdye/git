@@ -8,7 +8,7 @@
 #include "config.h"
 #include "run-command.h"
 #include "refs.h"
-#include "version.h"
+#include "help.h"
 #include "dir.h"
 #include "fsmonitor-ipc.h"
 #include "json-parser.h"
@@ -975,6 +975,15 @@ cleanup:
 	return res;
 }
 
+/*
+ * Dummy implementation; Using `get_version_info()` would cause a link error
+ * without this.
+ */
+void load_builtin_commands(const char *prefix, struct cmdnames *cmds)
+{
+	die("not implemented");
+}
+
 static int cmd_diagnose(int argc, const char **argv)
 {
 	struct option options[] = {
@@ -1009,10 +1018,7 @@ static int cmd_diagnose(int argc, const char **argv)
 	strbuf_addf(&buf, "Collecting diagnostic info into temp folder %s\n\n",
 		    tmp_dir.buf);
 
-	strbuf_addf(&buf, "git version %s\n", git_version_string);
-	strbuf_addf(&buf, "built from commit: %s\n\n",
-		    git_built_from_commit_string[0] ?
-		    git_built_from_commit_string : "(n/a)");
+	get_version_info(&buf, 1);
 
 	strbuf_addf(&buf, "Enlistment root: %s\n", the_repository->worktree);
 
