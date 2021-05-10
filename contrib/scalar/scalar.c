@@ -1074,10 +1074,20 @@ static int cmd_run(int argc, const char **argv)
 
 static int cmd_unregister(int argc, const char **argv)
 {
-	if (argc != 1 && argc != 2)
-		usage(_("scalar unregister [<worktree>]"));
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar unregister [<enlistment>]"),
+		NULL
+	};
 
-	return unregister_dir(argc < 2 ? NULL : argv[1]);
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
+
+	return unregister_dir(NULL);
 }
 
 static int cmd_cache_server(int argc, const char **argv)
@@ -1177,7 +1187,7 @@ struct {
 	{ "clone", cmd_clone, 0 },
 	{ "list", cmd_list, 0 },
 	{ "register", cmd_register, 0 },
-	{ "unregister", cmd_unregister, 1 },
+	{ "unregister", cmd_unregister, 0 },
 	{ "run", cmd_run, 1 },
 	{ "diagnose", cmd_diagnose, 1 },
 	{ "cache-server", cmd_cache_server, 0 },
