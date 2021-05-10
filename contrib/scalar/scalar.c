@@ -18,6 +18,58 @@ static int is_unattended(void) {
 	return git_env_bool("Scalar_UNATTENDED", 0);
 }
 
+static void setup_enlistment_directory(int argc, const char **argv,
+				       const char * const *usagestr,
+				       const struct option *options)
+{
+	if (startup_info->have_repository)
+		BUG("gitdir already set up?!?");
+
+	if (argc > 1)
+		usage_with_options(usagestr, options);
+
+	if (argc == 1) {
+		char *src = xstrfmt("%s/src", argv[0]);
+		const char *dir = is_directory(src) ? src : argv[0];
+
+		if (chdir(dir) < 0)
+			die_errno(_("could not switch to '%s'"), dir);
+
+		free(src);
+	} else {
+		/* find the worktree, and ensure that it is named `src` */
+		struct strbuf path = STRBUF_INIT;
+
+		if (strbuf_getcwd(&path) < 0)
+			die(_("need a working directory"));
+
+		for (;;) {
+			size_t len = path.len;
+
+			strbuf_addstr(&path, "/src/.git");
+			if (is_git_directory(path.buf)) {
+				strbuf_setlen(&path, len);
+				strbuf_addstr(&path, "/src");
+				if (chdir(path.buf) < 0)
+					die_errno(_("could not switch to '%s'"),
+						  path.buf);
+				strbuf_release(&path);
+				break;
+			}
+
+			for (; len > 0 && !is_dir_sep(path.buf[len]); len--)
+				; /* keep looking for parent directory */
+
+			if (!len)
+				die(_("could not find enlistment root"));
+
+			strbuf_setlen(&path, len);
+		}
+	}
+
+	setup_git_directory();
+}
+
 static int run_git(const char *dir, const char *arg, ...)
 {
 	struct strvec argv = STRVEC_INIT;
@@ -953,13 +1005,23 @@ static int cmd_list(int argc, const char **argv)
 
 static int cmd_register(int argc, const char **argv)
 {
-	if (argc != 1 && argc != 2)
-		usage(_("scalar register [<worktree>]"));
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar register [<enlistment>]"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	/* TODO: turn `feature.scalar` into the appropriate settings */
 	/* TODO: enable FSMonitor and other forgotten settings */
 
-	return register_dir(argc < 2 ? NULL : argv[1]);
+	return register_dir(NULL);
 }
 
 static int cmd_run(int argc, const char **argv)
@@ -1114,7 +1176,7 @@ struct {
 } builtins[] = {
 	{ "clone", cmd_clone, 0 },
 	{ "list", cmd_list, 0 },
-	{ "register", cmd_register, 1 },
+	{ "register", cmd_register, 0 },
 	{ "unregister", cmd_unregister, 1 },
 	{ "run", cmd_run, 1 },
 	{ "diagnose", cmd_diagnose, 1 },
