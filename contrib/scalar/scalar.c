@@ -1304,6 +1304,34 @@ static int cmd_delete(int argc, const char **argv)
 	return delete_enlistment();
 }
 
+static int cmd_version(int argc, const char **argv)
+{
+	int verbose = 0, build_options = 0;
+	struct option options[] = {
+		OPT__VERBOSE(&verbose, N_("include Git version")),
+		OPT_BOOL(0, "build-options", &build_options,
+			 N_("include Git's build options")),
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar verbose [-v | --verbose] [--build-options]"),
+		NULL
+	};
+	struct strbuf buf = STRBUF_INIT;
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	if (argc != 0)
+		usage_with_options(usage, options);
+
+	get_version_info(&buf, build_options);
+	fprintf(stderr, "%s\n", buf.buf);
+	strbuf_release(&buf);
+
+	return 0;
+}
+
 static int cmd_test(int argc, const char **argv)
 {
 	const char *url = argc > 1 ? argv[1] :
@@ -1328,6 +1356,7 @@ struct {
 	{ "diagnose", cmd_diagnose },
 	{ "cache-server", cmd_cache_server },
 	{ "delete", cmd_delete },
+	{ "version", cmd_version },
 	{ "test", cmd_test },
 	{ NULL, NULL},
 };
