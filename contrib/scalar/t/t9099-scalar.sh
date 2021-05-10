@@ -17,6 +17,9 @@ export GIT_TEST_MAINT_SCHEDULER
 Scalar_UNATTENDED=1
 export Scalar_UNATTENDED
 
+GIT_ASKPASS=true
+export GIT_ASKPASS
+
 test_expect_success 'scalar shows a usage' '
 	test_expect_code 129 scalar -h
 '
