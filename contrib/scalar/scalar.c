@@ -126,7 +126,7 @@ static void ensure_absolute_path(char **p)
 	*p = absolute;
 }
 
-static int set_recommended_config(const char *file)
+static int set_recommended_config(void)
 {
 	struct {
 		const char *key;
@@ -171,10 +171,12 @@ static int set_recommended_config(const char *file)
 	for (i = 0; config[i].key; i++) {
 		char *value;
 
-		if (file || git_config_get_string(config[i].key, &value)) {
+		if (git_config_get_string(config[i].key, &value)) {
 			trace2_data_string("scalar", the_repository, config[i].key, "created");
-			git_config_set_in_file_gently(file, config[i].key,
-						      config[i].value);
+			if (git_config_set_gently(config[i].key,
+						  config[i].value) < 0)
+				return error(_("could not configure %s=%s"),
+					     config[i].key, config[i].value);
 		} else {
 			trace2_data_string("scalar", the_repository, config[i].key, "exists");
 			free(value);
@@ -234,7 +236,7 @@ static int register_dir(void)
 	int res = add_or_remove_enlistment(1);
 
 	if (!res)
-		res = set_recommended_config(NULL);
+		res = set_recommended_config();
 
 	if (!res)
 		res = toggle_maintenance(1);
@@ -861,7 +863,7 @@ static int cmd_clone(int argc, const char **argv)
 	    (res = run_git(NULL, "sparse-checkout", "init", "--cone", NULL)))
 		goto cleanup;
 
-	if (set_recommended_config(NULL))
+	if (set_recommended_config())
 		return error(_("could not configure '%s'"), dir);
 
 	/*
