@@ -591,7 +591,8 @@ static int get_repository_id(struct json_iterator *it)
 	return 0;
 }
 
-static char *get_cache_key(const char *dir, const char *url)
+/* Needs to run this in a worktree; gvfs-helper requires a Git repository */
+static char *get_cache_key(const char *url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
@@ -603,7 +604,6 @@ static char *get_cache_key(const char *dir, const char *url)
 	 */
 	if (can_url_support_gvfs(url)) {
 		cp.git_cmd = 1;
-		cp.dir = dir; /* gvfs-helper requires a Git repository */
 		strvec_pushl(&cp.args, "gvfs-helper", "--remote", url,
 			     "endpoint", "vsts/info", NULL);
 		if (!pipe_command(&cp, NULL, 0, &out, 512, NULL, 0)) {
@@ -803,7 +803,7 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
-	if (!(cache_key = get_cache_key(NULL, url))) {
+	if (!(cache_key = get_cache_key(url))) {
 		res = error(_("could not determine cache key for '%s'"), url);
 		goto cleanup;
 	}
