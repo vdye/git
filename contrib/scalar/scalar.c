@@ -734,7 +734,7 @@ static int cmd_clone(int argc, const char **argv)
 		NULL
 	};
 	const char *url;
-	char *root = NULL, *dir = NULL, *config_path = NULL;
+	char *root = NULL, *dir = NULL;
 	char *cache_key = NULL, *shared_cache_path = NULL;
 	struct strbuf buf = STRBUF_INIT;
 	int res;
@@ -793,26 +793,31 @@ static int cmd_clone(int argc, const char **argv)
 	if ((res = run_git(NULL, "-c", buf.buf, "init", "--", dir, NULL)))
 		goto cleanup;
 
+	if (chdir(dir) < 0) {
+		res = error_errno(_("could not switch to '%s'"), dir);
+		goto cleanup;
+	}
+
+	setup_git_directory();
+
 	/* common-main already logs `argv` */
 	trace2_data_string("scalar", the_repository, "dir", dir);
 	trace2_data_intmax("scalar", the_repository, "unattended",
 			   is_unattended());
 
 	if (!branch &&
-	    !(branch = remote_default_branch(dir, url))) {
+	    !(branch = remote_default_branch(NULL, url))) {
 		res = error(_("failed to get default branch for '%s'"), url);
 		goto cleanup;
 	}
 
-	config_path = xstrfmt("%s/.git/config", dir);
-
-	if (!(cache_key = get_cache_key(dir, url))) {
+	if (!(cache_key = get_cache_key(NULL, url))) {
 		res = error(_("could not determine cache key for '%s'"), url);
 		goto cleanup;
 	}
 
 	shared_cache_path = xstrfmt("%s/%s", local_cache_root, cache_key);
-	if (set_config(config_path, "gvfs.sharedCache=%s", shared_cache_path)) {
+	if (set_config(NULL, "gvfs.sharedCache=%s", shared_cache_path)) {
 		res = error(_("could not configure shared cache"));
 		goto cleanup;
 	}
@@ -827,8 +832,8 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
-	if (set_config(config_path, "remote.origin.url=%s", url) ||
-	    set_config(config_path, "remote.origin.fetch="
+	if (set_config(NULL, "remote.origin.url=%s", url) ||
+	    set_config(NULL, "remote.origin.fetch="
 		    "+refs/heads/%s:refs/remotes/origin/%s",
 		    single_branch ? branch : "*",
 		    single_branch ? branch : "*")) {
@@ -837,22 +842,22 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (cache_server_url ||
-	    supports_gvfs_protocol(dir, url, &cache_server_url)) {
-		if (set_config(config_path, "core.useGVFSHelper=true") ||
-		    set_config(config_path, "core.gvfs=150")) {
+	    supports_gvfs_protocol(NULL, url, &cache_server_url)) {
+		if (set_config(NULL, "core.useGVFSHelper=true") ||
+		    set_config(NULL, "core.gvfs=150")) {
 			res = error(_("could not turn on GVFS helper"));
 			goto cleanup;
 		}
 		if (cache_server_url &&
-		    set_config(config_path,
+		    set_config(NULL,
 			       "gvfs.cache-server=%s", cache_server_url)) {
 			res = error(_("could not configure cache server"));
 			goto cleanup;
 		}
 	} else {
-		if (set_config(config_path, "core.useGVFSHelper=false") ||
-		    set_config(config_path, "remote.origin.promisor=true") ||
-		    set_config(config_path,
+		if (set_config(NULL, "core.useGVFSHelper=false") ||
+		    set_config(NULL, "remote.origin.promisor=true") ||
+		    set_config(NULL,
 			       "remote.origin.partialCloneFilter=blob:none")) {
 			res = error(_("could not configure partial clone in "
 				      "'%s'"), dir);
@@ -861,10 +866,10 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (!full_clone &&
-	    (res = run_git(dir, "sparse-checkout", "init", "--cone", NULL)))
+	    (res = run_git(NULL, "sparse-checkout", "init", "--cone", NULL)))
 		goto cleanup;
 
-	if (set_recommended_config(config_path))
+	if (set_recommended_config(NULL))
 		return error(_("could not configure '%s'"), dir);
 
 	/*
@@ -872,38 +877,36 @@ static int cmd_clone(int argc, const char **argv)
 	 * recognized by server", and suppress the error output in
 	 * that case?
 	 */
-	if ((res = run_git(dir, "fetch", "--quiet", "origin", NULL))) {
+	if ((res = run_git(NULL, "fetch", "--quiet", "origin", NULL))) {
 		warning(_("Partial clone failed; Trying full clone"));
 
-		if (set_config(config_path, "remote.origin.promisor") ||
-		    set_config(config_path,
-			       "remote.origin.partialCloneFilter")) {
+		if (set_config(NULL, "remote.origin.promisor") ||
+		    set_config(NULL, "remote.origin.partialCloneFilter")) {
 			res = error(_("could not configure for full clone"));
 			goto cleanup;
 		}
 
-		if ((res = run_git(dir, "fetch", "--quiet", "origin", NULL)))
+		if ((res = run_git(NULL, "fetch", "--quiet", "origin", NULL)))
 			goto cleanup;
 	}
 
-	if ((res = set_config(config_path, "branch.%s.remote=origin", branch)))
+	if ((res = set_config(NULL, "branch.%s.remote=origin", branch)))
 		goto cleanup;
-	if ((res = set_config(config_path, "branch.%s.merge=refs/heads/%s",
+	if ((res = set_config(NULL, "branch.%s.merge=refs/heads/%s",
 			      branch, branch)))
 		goto cleanup;
 
 	strbuf_reset(&buf);
 	strbuf_addf(&buf, "origin/%s", branch);
-	res = run_git(dir, "checkout", "-f", "-t", buf.buf, NULL);
+	res = run_git(NULL, "checkout", "-f", "-t", buf.buf, NULL);
 	if (res)
 		goto cleanup;
 
-	res = register_dir(dir);
+	res = register_dir(NULL);
 
 cleanup:
 	free(root);
 	free(dir);
-	free(config_path);
 	strbuf_release(&buf);
 	free(branch);
 	free(cache_server_url);
