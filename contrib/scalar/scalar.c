@@ -928,8 +928,7 @@ static int cmd_diagnose(int argc, const char **argv)
 	setup_enlistment_directory(argc, argv, usage, options);
 
 	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
-	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
-			localtime_r(&now, &tm), 0, 0);
+	strbuf_addftime(&buf, "%Y%m%d_%H%M%S", localtime_r(&now, &tm), 0, 0);
 	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
 		res = error(_("could not initialize temporary repository: %s"),
 			    buf.buf);
