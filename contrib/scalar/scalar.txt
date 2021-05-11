@@ -27,9 +27,14 @@ experience will speed up. Scalar sets advanced Git config settings,
 maintains your repositories in the background, and helps reduce data sent
 across the network.
 
+An important Scalar concept is the enlistment: this is the top-level directory
+of the project. It contains the subdirectory `src/` which is a Git worktree.
+This encourages the separation between tracked files (inside `src/`) and
+untracked files (outside `src/`).
+
 The command implements various subcommands, and different options depending
 on the subcommand. With the exception of `clone` and `list`, all subcommands
-expect to be run in a Git worktree.
+expect to be run in an enlistment.
 
 The following options can be specified _before_ the subcommand:
 
