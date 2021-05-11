@@ -246,15 +246,15 @@ static int register_dir(void)
 	return res;
 }
 
-static int unregister_dir(const char *dir)
+static int unregister_dir(void)
 {
-	int res = stop_fsmonitor_daemon(dir);
+	int res = stop_fsmonitor_daemon(NULL);
 
 	if (!res)
-		res = add_or_remove_enlistment(dir, 0);
+		res = add_or_remove_enlistment(NULL, 0);
 
 	if (!res)
-		res = toggle_maintenance(dir, 0);
+		res = toggle_maintenance(NULL, 0);
 
 	return res;
 }
@@ -1110,7 +1110,7 @@ static int cmd_unregister(int argc, const char **argv)
 
 	setup_enlistment_directory(argc, argv, usage, options);
 
-	return unregister_dir(NULL);
+	return unregister_dir();
 }
 
 static int cmd_cache_server(int argc, const char **argv)
