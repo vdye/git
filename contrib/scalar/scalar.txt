@@ -14,8 +14,8 @@ scalar clone [--single-branch] [--branch <main-branch>] [--full-clone]
 scalar list
 scalar register [<enlistment>]
 scalar unregister [<enlistment>]
-scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files )
-scalar diagnose
+scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files ) [<enlistment>]
+scalar diagnose [<enlistment>]
 scalar cache-server ( --get | --set <url> | --list [<remote>] )
 
 DESCRIPTION
@@ -126,7 +126,7 @@ unregister [<enlistment>]::
 Run
 ~~~
 
-scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files )::
+scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files ) [<enlistment>]::
     Run the given maintenance task (or all tasks, if `all` was specified).
     Except for `all` and `config`, this subcommand simply hands off to
     linkgit:git-maintenance[1] (mapping `fetch` to `prefetch` and
@@ -144,10 +144,10 @@ automatically, explicit invocations of this task are rarely needed.
 Diagnose
 ~~~~~~~~
 
-diagnose::
+diagnose [<enlistment>]::
     When reporting issues with Scalar, it is often helpful to provide the
     information gathered by this command, including logs and certain
-    statistics describing the data shape of the current repository.
+    statistics describing the data shape of the current enlistment.
 +
 The output of this command is a `.zip` file that is written into
 a directory adjacent to the worktree in the `src` directory.
