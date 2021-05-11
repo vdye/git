@@ -219,12 +219,12 @@ static int add_or_remove_enlistment(const char *dir, int add)
 		       "scalar.repo", worktree, NULL);
 }
 
-static int stop_fsmonitor_daemon(const char *dir)
+static int stop_fsmonitor_daemon(void)
 {
 	int res = 0;
 
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	res = run_git(dir, "fsmonitor--daemon", "--stop", NULL);
+	res = run_git(NULL, "fsmonitor--daemon", "--stop", NULL);
 
 	if (res == 1 && fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
 		res = error(_("could not stop the FSMonitor daemon"));
@@ -248,7 +248,7 @@ static int register_dir(void)
 
 static int unregister_dir(void)
 {
-	int res = stop_fsmonitor_daemon(NULL);
+	int res = stop_fsmonitor_daemon();
 
 	if (!res)
 		res = add_or_remove_enlistment(NULL, 0);
