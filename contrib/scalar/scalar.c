@@ -190,21 +190,16 @@ static int toggle_maintenance(const char *dir, int enable)
 		       NULL);
 }
 
-static int add_or_remove_enlistment(const char *dir, int add)
+static int add_or_remove_enlistment(int add)
 {
-	char *p = NULL;
-	const char *worktree;
 	int res;
 
-	if (dir)
-		worktree = p = real_pathdup(dir, 1);
-	else if (!the_repository->worktree)
+	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
-	else
-		worktree = the_repository->worktree;
 
-	res = run_git(dir, "config", "--global", "--get",
-		      "--fixed-value", "scalar.repo", worktree, NULL);
+	res = run_git(NULL, "config", "--global", "--get",
+		      "--fixed-value", "scalar.repo",
+		      the_repository->worktree, NULL);
 
 	/*
 	 * If we want to add and the setting is already there, then do nothing.
@@ -213,10 +208,11 @@ static int add_or_remove_enlistment(const char *dir, int add)
 	if ((add && !res) || (!add && res))
 		return 0;
 
-	return run_git(dir, "config", "--global",
+	return run_git(NULL, "config", "--global",
 		       add ? "--add" : "--unset",
 		       add ? "--no-fixed-value" : "--fixed-value",
-		       "scalar.repo", worktree, NULL);
+		       "scalar.repo",
+		       the_repository->worktree, NULL);
 }
 
 static int stop_fsmonitor_daemon(void)
@@ -235,7 +231,7 @@ static int stop_fsmonitor_daemon(void)
 
 static int register_dir(void)
 {
-	int res = add_or_remove_enlistment(NULL, 1);
+	int res = add_or_remove_enlistment(1);
 
 	if (!res)
 		res = set_recommended_config(NULL);
@@ -251,7 +247,7 @@ static int unregister_dir(void)
 	int res = stop_fsmonitor_daemon();
 
 	if (!res)
-		res = add_or_remove_enlistment(NULL, 0);
+		res = add_or_remove_enlistment(0);
 
 	if (!res)
 		res = toggle_maintenance(NULL, 0);
