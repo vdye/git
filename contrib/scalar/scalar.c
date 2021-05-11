@@ -645,13 +645,12 @@ static char *get_cache_key(const char *url)
 	return cache_key;
 }
 
-static char *remote_default_branch(const char *dir, const char *url)
+static char *remote_default_branch(const char *url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
 
 	cp.git_cmd = 1;
-	cp.dir = dir;
 	strvec_pushl(&cp.args, "ls-remote", "--symref", url, "HEAD", NULL);
 	strbuf_addstr(&out, "-\n");
 	if (!pipe_command(&cp, NULL, 0, &out, 0, NULL, 0)) {
@@ -685,7 +684,6 @@ static char *remote_default_branch(const char *dir, const char *url)
 
 	child_process_init(&cp);
 	cp.git_cmd = 1;
-	cp.dir = dir;
 	strvec_pushl(&cp.args, "symbolic-ref", "--short", "HEAD", NULL);
 	if (!pipe_command(&cp, NULL, 0, &out, 0, NULL, 0)) {
 		strbuf_trim(&out);
@@ -797,8 +795,7 @@ static int cmd_clone(int argc, const char **argv)
 	trace2_data_intmax("scalar", the_repository, "unattended",
 			   is_unattended());
 
-	if (!branch &&
-	    !(branch = remote_default_branch(NULL, url))) {
+	if (!branch && !(branch = remote_default_branch(url))) {
 		res = error(_("failed to get default branch for '%s'"), url);
 		goto cleanup;
 	}
