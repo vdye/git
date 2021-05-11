@@ -233,19 +233,15 @@ static int stop_fsmonitor_daemon(const char *dir)
 	return res;
 }
 
-static int register_dir(const char *dir)
+static int register_dir(void)
 {
-	int res = add_or_remove_enlistment(dir, 1);
-
-	if (!res) {
-		char *config_path =
-			dir ? xstrfmt("%s/.git/config", dir) : NULL;
-		res = set_recommended_config(config_path);
-		free(config_path);
-	}
+	int res = add_or_remove_enlistment(NULL, 1);
 
 	if (!res)
-		res = toggle_maintenance(dir, 1);
+		res = set_recommended_config(NULL);
+
+	if (!res)
+		res = toggle_maintenance(NULL, 1);
 
 	return res;
 }
@@ -902,7 +898,7 @@ static int cmd_clone(int argc, const char **argv)
 	if (res)
 		goto cleanup;
 
-	res = register_dir(NULL);
+	res = register_dir();
 
 cleanup:
 	free(root);
@@ -1033,7 +1029,7 @@ static int cmd_register(int argc, const char **argv)
 	/* TODO: turn `feature.scalar` into the appropriate settings */
 	/* TODO: enable FSMonitor and other forgotten settings */
 
-	return register_dir(NULL);
+	return register_dir();
 }
 
 static int cmd_run(int argc, const char **argv)
@@ -1084,13 +1080,13 @@ static int cmd_run(int argc, const char **argv)
 	strbuf_release(&buf);
 
 	if (i == 0)
-		return register_dir(NULL);
+		return register_dir();
 
 	if (i > 0)
 		return run_git(NULL, "maintenance", "run",
 			       "--task", tasks[i].task, NULL);
 
-	if (register_dir(NULL))
+	if (register_dir())
 		return -1;
 	for (i = 1; tasks[i].arg; i++)
 		if (run_git(NULL, "maintenance", "run",
