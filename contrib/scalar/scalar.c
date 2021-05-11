@@ -637,7 +637,8 @@ static char *get_cache_key(const char *dir, const char *url)
 
 		strbuf_release(&downcased);
 
-		cache_key = xstrfmt("url_%s", hash_to_hex(hash));
+		cache_key = xstrfmt("url_%s",
+				    hash_to_hex_algop(hash, hash_algo));
 	}
 
 	strbuf_release(&out);
