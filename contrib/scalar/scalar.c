@@ -1200,16 +1200,15 @@ static int cmd_test(int argc, const char **argv)
 struct {
 	const char *name;
 	int (*fn)(int, const char **);
-	int needs_git_repo;
 } builtins[] = {
-	{ "clone", cmd_clone, 0 },
-	{ "list", cmd_list, 0 },
-	{ "register", cmd_register, 0 },
-	{ "unregister", cmd_unregister, 0 },
-	{ "run", cmd_run, 0 },
-	{ "diagnose", cmd_diagnose, 0 },
-	{ "cache-server", cmd_cache_server, 0 },
-	{ "test", cmd_test, 0 },
+	{ "clone", cmd_clone },
+	{ "list", cmd_list },
+	{ "register", cmd_register },
+	{ "unregister", cmd_unregister },
+	{ "run", cmd_run },
+	{ "diagnose", cmd_diagnose },
+	{ "cache-server", cmd_cache_server },
+	{ "test", cmd_test },
 	{ NULL, NULL},
 };
 
@@ -1248,11 +1247,8 @@ int cmd_main(int argc, const char **argv)
 		argc--;
 
 		for (i = 0; builtins[i].name; i++)
-			if (!strcmp(builtins[i].name, argv[0])) {
-				if (builtins[i].needs_git_repo)
-					setup_git_directory();
+			if (!strcmp(builtins[i].name, argv[0]))
 				return builtins[i].fn(argc, argv);
-			}
 	}
 
 	strbuf_addstr(&scalar_usage,
