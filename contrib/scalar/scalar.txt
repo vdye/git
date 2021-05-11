@@ -12,8 +12,8 @@ scalar clone [--single-branch] [--branch <main-branch>] [--full-clone]
          [--no-fetch-commits-and-trees] [--local-cache-path <path>]
          [--cache-server-url <url>] <url> [<enlistment>]
 scalar list
-scalar register
-scalar unregister
+scalar register [<enlistment>]
+scalar unregister [<enlistment>]
 scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files )
 scalar diagnose
 scalar cache-server ( --get | --set <url> | --list [<remote>] )
@@ -110,17 +110,18 @@ list::
 Register
 ~~~~~~~~
 
-register [<path>]::
-    Adds a repository to the list of registered repositories. If `<path>`
-    is not provided, then the repository associated with the current
-    directory is registered.
+register [<enlistment>]::
+    Adds a repository to the list of registered repositories. If
+    `<enlistment>` is not provided, then the enlistment associated with the
+    current working directory is registered.
 
 Unregister
 ~~~~~~~~~~
 
-unregister [<path>]::
+unregister [<enlistment>]::
     Remove the specified repository from the list of repositories
-    registered with Scalar.
+    registered with Scalar. This stops the scheduled maintenance and the
+    built-in FSMonitor.
 
 Run
 ~~~
