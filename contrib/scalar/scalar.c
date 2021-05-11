@@ -184,9 +184,9 @@ static int set_recommended_config(const char *file)
 	return 0;
 }
 
-static int toggle_maintenance(const char *dir, int enable)
+static int toggle_maintenance(int enable)
 {
-	return run_git(dir, "maintenance", enable ? "start" : "unregister",
+	return run_git(NULL, "maintenance", enable ? "start" : "unregister",
 		       NULL);
 }
 
@@ -237,7 +237,7 @@ static int register_dir(void)
 		res = set_recommended_config(NULL);
 
 	if (!res)
-		res = toggle_maintenance(NULL, 1);
+		res = toggle_maintenance(1);
 
 	return res;
 }
@@ -250,7 +250,7 @@ static int unregister_dir(void)
 		res = add_or_remove_enlistment(0);
 
 	if (!res)
-		res = toggle_maintenance(NULL, 0);
+		res = toggle_maintenance(0);
 
 	return res;
 }
