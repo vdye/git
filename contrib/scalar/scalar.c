@@ -502,9 +502,11 @@ static int can_url_support_gvfs(const char *url)
 
 /*
  * If `cache_server_url` is `NULL`, print the list to `stdout`.
+ *
+ * Since `gvfs-helper` requires a Git directory, this _must_ be run in
+ * a worktree.
  */
-static int supports_gvfs_protocol(const char *dir, const char *url,
-				  char **cache_server_url)
+static int supports_gvfs_protocol(const char *url, char **cache_server_url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
@@ -517,7 +519,6 @@ static int supports_gvfs_protocol(const char *dir, const char *url,
 		return 0;
 
 	cp.git_cmd = 1;
-	cp.dir = dir; /* gvfs-helper requires a Git repository */
 	strvec_pushl(&cp.args, "gvfs-helper", "--remote", url, "config", NULL);
 	if (!pipe_command(&cp, NULL, 0, &out, 512, NULL, 0)) {
 		long l = 0;
@@ -832,7 +833,7 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (cache_server_url ||
-	    supports_gvfs_protocol(NULL, url, &cache_server_url)) {
+	    supports_gvfs_protocol(url, &cache_server_url)) {
 		if (set_config("core.useGVFSHelper=true") ||
 		    set_config("core.gvfs=150")) {
 			res = error(_("could not turn on GVFS helper"));
@@ -1157,7 +1158,7 @@ static int cmd_cache_server(int argc, const char **argv)
 			}
 			url = remote->url[0];
 		}
-		res = supports_gvfs_protocol(NULL, url, NULL);
+		res = supports_gvfs_protocol(url, NULL);
 		free(list);
 	} else if (set) {
 		res = set_config("gvfs.cache-server=%s", set);
@@ -1179,7 +1180,7 @@ static int cmd_test(int argc, const char **argv)
 	const char *url = argc > 1 ? argv[1] :
 		"https://dev.azure.com/gvfs/ci/_git/ForTests";
 	char *p = NULL;
-	int res = supports_gvfs_protocol(NULL, url, &p);
+	int res = supports_gvfs_protocol(url, &p);
 
 	printf("resolve: %d, %s\n", res, p);
 
