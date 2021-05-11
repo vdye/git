@@ -16,7 +16,7 @@ scalar register [<enlistment>]
 scalar unregister [<enlistment>]
 scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files ) [<enlistment>]
 scalar diagnose [<enlistment>]
-scalar cache-server ( --get | --set <url> | --list [<remote>] )
+scalar cache-server ( --get | --set <url> | --list [<remote>] ) [<enlistment>]
 
 DESCRIPTION
 -----------
@@ -155,7 +155,7 @@ a directory adjacent to the worktree in the `src` directory.
 Cache-server
 ~~~~~~~~~~~~
 
-cache-server ( --get | --set <url> | --list [<remote>] )::
+cache-server ( --get | --set <url> | --list [<remote>] ) [<enlistment>]::
     This command lets you query or set the GVFS-enabled cache server used
     to fetch missing objects.
 
