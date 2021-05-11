@@ -70,7 +70,7 @@ static void setup_enlistment_directory(int argc, const char **argv,
 	setup_git_directory();
 }
 
-static int run_git(const char *dir, const char *arg, ...)
+static int run_git(const char *arg, ...)
 {
 	struct strvec argv = STRVEC_INIT;
 	va_list args;
@@ -83,7 +83,7 @@ static int run_git(const char *dir, const char *arg, ...)
 		strvec_push(&argv, p);
 	va_end(args);
 
-	res = run_command_v_opt_cd_env(argv.v, RUN_GIT_CMD, dir, NULL);
+	res = run_command_v_opt(argv.v, RUN_GIT_CMD);
 
 	strvec_clear(&argv);
 	return res;
@@ -188,8 +188,7 @@ static int set_recommended_config(void)
 
 static int toggle_maintenance(int enable)
 {
-	return run_git(NULL, "maintenance", enable ? "start" : "unregister",
-		       NULL);
+	return run_git("maintenance", enable ? "start" : "unregister", NULL);
 }
 
 static int add_or_remove_enlistment(int add)
@@ -199,9 +198,8 @@ static int add_or_remove_enlistment(int add)
 	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
 
-	res = run_git(NULL, "config", "--global", "--get",
-		      "--fixed-value", "scalar.repo",
-		      the_repository->worktree, NULL);
+	res = run_git("config", "--global", "--get", "--fixed-value",
+		      "scalar.repo", the_repository->worktree, NULL);
 
 	/*
 	 * If we want to add and the setting is already there, then do nothing.
@@ -210,11 +208,9 @@ static int add_or_remove_enlistment(int add)
 	if ((add && !res) || (!add && res))
 		return 0;
 
-	return run_git(NULL, "config", "--global",
-		       add ? "--add" : "--unset",
+	return run_git("config", "--global", add ? "--add" : "--unset",
 		       add ? "--no-fixed-value" : "--fixed-value",
-		       "scalar.repo",
-		       the_repository->worktree, NULL);
+		       "scalar.repo", the_repository->worktree, NULL);
 }
 
 static int stop_fsmonitor_daemon(void)
@@ -222,7 +218,7 @@ static int stop_fsmonitor_daemon(void)
 	int res = 0;
 
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	res = run_git(NULL, "fsmonitor--daemon", "--stop", NULL);
+	res = run_git("fsmonitor--daemon", "--stop", NULL);
 
 	if (res == 1 && fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
 		res = error(_("could not stop the FSMonitor daemon"));
@@ -784,7 +780,7 @@ static int cmd_clone(int argc, const char **argv)
 		free(b);
 	}
 
-	if ((res = run_git(NULL, "-c", buf.buf, "init", "--", dir, NULL)))
+	if ((res = run_git("-c", buf.buf, "init", "--", dir, NULL)))
 		goto cleanup;
 
 	if (chdir(dir) < 0) {
@@ -858,7 +854,7 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (!full_clone &&
-	    (res = run_git(NULL, "sparse-checkout", "init", "--cone", NULL)))
+	    (res = run_git("sparse-checkout", "init", "--cone", NULL)))
 		goto cleanup;
 
 	if (set_recommended_config())
@@ -869,7 +865,7 @@ static int cmd_clone(int argc, const char **argv)
 	 * recognized by server", and suppress the error output in
 	 * that case?
 	 */
-	if ((res = run_git(NULL, "fetch", "--quiet", "origin", NULL))) {
+	if ((res = run_git("fetch", "--quiet", "origin", NULL))) {
 		warning(_("Partial clone failed; Trying full clone"));
 
 		if (set_config("remote.origin.promisor") ||
@@ -878,7 +874,7 @@ static int cmd_clone(int argc, const char **argv)
 			goto cleanup;
 		}
 
-		if ((res = run_git(NULL, "fetch", "--quiet", "origin", NULL)))
+		if ((res = run_git("fetch", "--quiet", "origin", NULL)))
 			goto cleanup;
 	}
 
@@ -890,7 +886,7 @@ static int cmd_clone(int argc, const char **argv)
 
 	strbuf_reset(&buf);
 	strbuf_addf(&buf, "origin/%s", branch);
-	res = run_git(NULL, "checkout", "-f", "-t", buf.buf, NULL);
+	res = run_git("checkout", "-f", "-t", buf.buf, NULL);
 	if (res)
 		goto cleanup;
 
@@ -932,8 +928,7 @@ static int cmd_diagnose(int argc, const char **argv)
 	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
 	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
 			localtime_r(&now, &tm), 0, 0);
-	if (run_git(NULL, "init", "-q", "-b", "dummy",
-		    "--bare", buf.buf, NULL)) {
+	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
 		res = error(_("could not initialize temporary repository: %s"),
 			    buf.buf);
 		goto diagnose_cleanup;
@@ -1003,8 +998,7 @@ static int cmd_list(int argc, const char **argv)
 	if (argc != 1)
 		die(_("`scalar list` does not take arguments"));
 
-	return run_git(NULL, "config", "--global",
-		       "--get-all", "scalar.repo", NULL);
+	return run_git("config", "--global", "--get-all", "scalar.repo", NULL);
 }
 
 static int cmd_register(int argc, const char **argv)
@@ -1079,13 +1073,13 @@ static int cmd_run(int argc, const char **argv)
 		return register_dir();
 
 	if (i > 0)
-		return run_git(NULL, "maintenance", "run",
+		return run_git("maintenance", "run",
 			       "--task", tasks[i].task, NULL);
 
 	if (register_dir())
 		return -1;
 	for (i = 1; tasks[i].arg; i++)
-		if (run_git(NULL, "maintenance", "run",
+		if (run_git("maintenance", "run",
 			    "--task", tasks[i].task, NULL))
 			return -1;
 	return 0;
