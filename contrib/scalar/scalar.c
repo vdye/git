@@ -18,7 +18,59 @@ static int is_unattended(void) {
 	return git_env_bool("Scalar_UNATTENDED", 0);
 }
 
-static int run_git(const char *dir, const char *arg, ...)
+static void setup_enlistment_directory(int argc, const char **argv,
+				       const char * const *usagestr,
+				       const struct option *options)
+{
+	if (startup_info->have_repository)
+		BUG("gitdir already set up?!?");
+
+	if (argc > 1)
+		usage_with_options(usagestr, options);
+
+	if (argc == 1) {
+		char *src = xstrfmt("%s/src", argv[0]);
+		const char *dir = is_directory(src) ? src : argv[0];
+
+		if (chdir(dir) < 0)
+			die_errno(_("could not switch to '%s'"), dir);
+
+		free(src);
+	} else {
+		/* find the worktree, and ensure that it is named `src` */
+		struct strbuf path = STRBUF_INIT;
+
+		if (strbuf_getcwd(&path) < 0)
+			die(_("need a working directory"));
+
+		for (;;) {
+			size_t len = path.len;
+
+			strbuf_addstr(&path, "/src/.git");
+			if (is_git_directory(path.buf)) {
+				strbuf_setlen(&path, len);
+				strbuf_addstr(&path, "/src");
+				if (chdir(path.buf) < 0)
+					die_errno(_("could not switch to '%s'"),
+						  path.buf);
+				strbuf_release(&path);
+				break;
+			}
+
+			for (; len > 0 && !is_dir_sep(path.buf[len]); len--)
+				; /* keep looking for parent directory */
+
+			if (!len)
+				die(_("could not find enlistment root"));
+
+			strbuf_setlen(&path, len);
+		}
+	}
+
+	setup_git_directory();
+}
+
+static int run_git(const char *arg, ...)
 {
 	struct strvec argv = STRVEC_INIT;
 	va_list args;
@@ -31,7 +83,7 @@ static int run_git(const char *dir, const char *arg, ...)
 		strvec_push(&argv, p);
 	va_end(args);
 
-	res = run_command_v_opt_cd_env(argv.v, RUN_GIT_CMD, dir, NULL);
+	res = run_command_v_opt(argv.v, RUN_GIT_CMD);
 
 	strvec_clear(&argv);
 	return res;
@@ -74,7 +126,7 @@ static void ensure_absolute_path(char **p)
 	*p = absolute;
 }
 
-static int set_recommended_config(const char *file)
+static int set_recommended_config(void)
 {
 	struct {
 		const char *key;
@@ -119,10 +171,12 @@ static int set_recommended_config(const char *file)
 	for (i = 0; config[i].key; i++) {
 		char *value;
 
-		if (file || git_config_get_string(config[i].key, &value)) {
+		if (git_config_get_string(config[i].key, &value)) {
 			trace2_data_string("scalar", the_repository, config[i].key, "created");
-			git_config_set_in_file_gently(file, config[i].key,
-						      config[i].value);
+			if (git_config_set_gently(config[i].key,
+						  config[i].value) < 0)
+				return error(_("could not configure %s=%s"),
+					     config[i].key, config[i].value);
 		} else {
 			trace2_data_string("scalar", the_repository, config[i].key, "exists");
 			free(value);
@@ -132,27 +186,20 @@ static int set_recommended_config(const char *file)
 	return 0;
 }
 
-static int toggle_maintenance(const char *dir, int enable)
+static int toggle_maintenance(int enable)
 {
-	return run_git(dir, "maintenance", enable ? "start" : "unregister",
-		       NULL);
+	return run_git("maintenance", enable ? "start" : "unregister", NULL);
 }
 
-static int add_or_remove_enlistment(const char *dir, int add)
+static int add_or_remove_enlistment(int add)
 {
-	char *p = NULL;
-	const char *worktree;
 	int res;
 
-	if (dir)
-		worktree = p = real_pathdup(dir, 1);
-	else if (!the_repository->worktree)
+	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
-	else
-		worktree = the_repository->worktree;
 
-	res = run_git(dir, "config", "--global", "--get",
-		      "--fixed-value", "scalar.repo", worktree, NULL);
+	res = run_git("config", "--global", "--get", "--fixed-value",
+		      "scalar.repo", the_repository->worktree, NULL);
 
 	/*
 	 * If we want to add and the setting is already there, then do nothing.
@@ -161,18 +208,17 @@ static int add_or_remove_enlistment(const char *dir, int add)
 	if ((add && !res) || (!add && res))
 		return 0;
 
-	return run_git(dir, "config", "--global",
-		       add ? "--add" : "--unset",
+	return run_git("config", "--global", add ? "--add" : "--unset",
 		       add ? "--no-fixed-value" : "--fixed-value",
-		       "scalar.repo", worktree, NULL);
+		       "scalar.repo", the_repository->worktree, NULL);
 }
 
-static int stop_fsmonitor_daemon(const char *dir)
+static int stop_fsmonitor_daemon(void)
 {
 	int res = 0;
 
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	res = run_git(dir, "fsmonitor--daemon", "--stop", NULL);
+	res = run_git("fsmonitor--daemon", "--stop", NULL);
 
 	if (res == 1 && fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
 		res = error(_("could not stop the FSMonitor daemon"));
@@ -181,32 +227,28 @@ static int stop_fsmonitor_daemon(const char *dir)
 	return res;
 }
 
-static int register_dir(const char *dir)
+static int register_dir(void)
 {
-	int res = add_or_remove_enlistment(dir, 1);
-
-	if (!res) {
-		char *config_path =
-			dir ? xstrfmt("%s/.git/config", dir) : NULL;
-		res = set_recommended_config(config_path);
-		free(config_path);
-	}
+	int res = add_or_remove_enlistment(1);
 
 	if (!res)
-		res = toggle_maintenance(dir, 1);
+		res = set_recommended_config();
+
+	if (!res)
+		res = toggle_maintenance(1);
 
 	return res;
 }
 
-static int unregister_dir(const char *dir)
+static int unregister_dir(void)
 {
-	int res = stop_fsmonitor_daemon(dir);
+	int res = stop_fsmonitor_daemon();
 
 	if (!res)
-		res = add_or_remove_enlistment(dir, 0);
+		res = add_or_remove_enlistment(0);
 
 	if (!res)
-		res = toggle_maintenance(dir, 0);
+		res = toggle_maintenance(0);
 
 	return res;
 }
@@ -380,7 +422,7 @@ static int get_disk_info(struct strbuf *out)
 }
 
 /* printf-style interface, expects `<key>=<value>` argument */
-static int set_config(const char *file, const char *fmt, ...)
+static int set_config(const char *fmt, ...)
 {
 	struct strbuf buf = STRBUF_INIT;
 	char *value;
@@ -394,7 +436,7 @@ static int set_config(const char *file, const char *fmt, ...)
 	value = strchr(buf.buf, '=');
 	if (value)
 		*(value++) = '\0';
-	res = git_config_set_in_file_gently(file, buf.buf, value);
+	res = git_config_set_gently(buf.buf, value);
 	strbuf_release(&buf);
 
 	return res;
@@ -460,9 +502,11 @@ static int can_url_support_gvfs(const char *url)
 
 /*
  * If `cache_server_url` is `NULL`, print the list to `stdout`.
+ *
+ * Since `gvfs-helper` requires a Git directory, this _must_ be run in
+ * a worktree.
  */
-static int supports_gvfs_protocol(const char *dir, const char *url,
-				  char **cache_server_url)
+static int supports_gvfs_protocol(const char *url, char **cache_server_url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
@@ -475,7 +519,6 @@ static int supports_gvfs_protocol(const char *dir, const char *url,
 		return 0;
 
 	cp.git_cmd = 1;
-	cp.dir = dir; /* gvfs-helper requires a Git repository */
 	strvec_pushl(&cp.args, "gvfs-helper", "--remote", url, "config", NULL);
 	if (!pipe_command(&cp, NULL, 0, &out, 512, NULL, 0)) {
 		long l = 0;
@@ -594,7 +637,8 @@ static char *get_cache_key(const char *dir, const char *url)
 
 		strbuf_release(&downcased);
 
-		cache_key = xstrfmt("url_%s", hash_to_hex(hash));
+		cache_key = xstrfmt("url_%s",
+				    hash_to_hex_algop(hash, hash_algo));
 	}
 
 	strbuf_release(&out);
@@ -682,7 +726,7 @@ static int cmd_clone(int argc, const char **argv)
 		NULL
 	};
 	const char *url;
-	char *root = NULL, *dir = NULL, *config_path = NULL;
+	char *root = NULL, *dir = NULL;
 	char *cache_key = NULL, *shared_cache_path = NULL;
 	struct strbuf buf = STRBUF_INIT;
 	int res;
@@ -738,8 +782,15 @@ static int cmd_clone(int argc, const char **argv)
 		free(b);
 	}
 
-	if ((res = run_git(NULL, "-c", buf.buf, "init", "--", dir, NULL)))
+	if ((res = run_git("-c", buf.buf, "init", "--", dir, NULL)))
 		goto cleanup;
+
+	if (chdir(dir) < 0) {
+		res = error_errno(_("could not switch to '%s'"), dir);
+		goto cleanup;
+	}
+
+	setup_git_directory();
 
 	/* common-main already logs `argv` */
 	trace2_data_string("scalar", the_repository, "dir", dir);
@@ -747,20 +798,18 @@ static int cmd_clone(int argc, const char **argv)
 			   is_unattended());
 
 	if (!branch &&
-	    !(branch = remote_default_branch(dir, url))) {
+	    !(branch = remote_default_branch(NULL, url))) {
 		res = error(_("failed to get default branch for '%s'"), url);
 		goto cleanup;
 	}
 
-	config_path = xstrfmt("%s/.git/config", dir);
-
-	if (!(cache_key = get_cache_key(dir, url))) {
+	if (!(cache_key = get_cache_key(NULL, url))) {
 		res = error(_("could not determine cache key for '%s'"), url);
 		goto cleanup;
 	}
 
 	shared_cache_path = xstrfmt("%s/%s", local_cache_root, cache_key);
-	if (set_config(config_path, "gvfs.sharedCache=%s", shared_cache_path)) {
+	if (set_config("gvfs.sharedCache=%s", shared_cache_path)) {
 		res = error(_("could not configure shared cache"));
 		goto cleanup;
 	}
@@ -775,8 +824,8 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
-	if (set_config(config_path, "remote.origin.url=%s", url) ||
-	    set_config(config_path, "remote.origin.fetch="
+	if (set_config("remote.origin.url=%s", url) ||
+	    set_config("remote.origin.fetch="
 		    "+refs/heads/%s:refs/remotes/origin/%s",
 		    single_branch ? branch : "*",
 		    single_branch ? branch : "*")) {
@@ -785,23 +834,21 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (cache_server_url ||
-	    supports_gvfs_protocol(dir, url, &cache_server_url)) {
-		if (set_config(config_path, "core.useGVFSHelper=true") ||
-		    set_config(config_path, "core.gvfs=150")) {
+	    supports_gvfs_protocol(url, &cache_server_url)) {
+		if (set_config("core.useGVFSHelper=true") ||
+		    set_config("core.gvfs=150")) {
 			res = error(_("could not turn on GVFS helper"));
 			goto cleanup;
 		}
 		if (cache_server_url &&
-		    set_config(config_path,
-			       "gvfs.cache-server=%s", cache_server_url)) {
+		    set_config("gvfs.cache-server=%s", cache_server_url)) {
 			res = error(_("could not configure cache server"));
 			goto cleanup;
 		}
 	} else {
-		if (set_config(config_path, "core.useGVFSHelper=false") ||
-		    set_config(config_path, "remote.origin.promisor=true") ||
-		    set_config(config_path,
-			       "remote.origin.partialCloneFilter=blob:none")) {
+		if (set_config("core.useGVFSHelper=false") ||
+		    set_config("remote.origin.promisor=true") ||
+		    set_config("remote.origin.partialCloneFilter=blob:none")) {
 			res = error(_("could not configure partial clone in "
 				      "'%s'"), dir);
 			goto cleanup;
@@ -809,10 +856,10 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	if (!full_clone &&
-	    (res = run_git(dir, "sparse-checkout", "init", "--cone", NULL)))
+	    (res = run_git("sparse-checkout", "init", "--cone", NULL)))
 		goto cleanup;
 
-	if (set_recommended_config(config_path))
+	if (set_recommended_config())
 		return error(_("could not configure '%s'"), dir);
 
 	/*
@@ -820,38 +867,36 @@ static int cmd_clone(int argc, const char **argv)
 	 * recognized by server", and suppress the error output in
 	 * that case?
 	 */
-	if ((res = run_git(dir, "fetch", "--quiet", "origin", NULL))) {
+	if ((res = run_git("fetch", "--quiet", "origin", NULL))) {
 		warning(_("Partial clone failed; Trying full clone"));
 
-		if (set_config(config_path, "remote.origin.promisor") ||
-		    set_config(config_path,
-			       "remote.origin.partialCloneFilter")) {
+		if (set_config("remote.origin.promisor") ||
+		    set_config("remote.origin.partialCloneFilter")) {
 			res = error(_("could not configure for full clone"));
 			goto cleanup;
 		}
 
-		if ((res = run_git(dir, "fetch", "--quiet", "origin", NULL)))
+		if ((res = run_git("fetch", "--quiet", "origin", NULL)))
 			goto cleanup;
 	}
 
-	if ((res = set_config(config_path, "branch.%s.remote=origin", branch)))
+	if ((res = set_config("branch.%s.remote=origin", branch)))
 		goto cleanup;
-	if ((res = set_config(config_path, "branch.%s.merge=refs/heads/%s",
+	if ((res = set_config("branch.%s.merge=refs/heads/%s",
 			      branch, branch)))
 		goto cleanup;
 
 	strbuf_reset(&buf);
 	strbuf_addf(&buf, "origin/%s", branch);
-	res = run_git(dir, "checkout", "-f", "-t", buf.buf, NULL);
+	res = run_git("checkout", "-f", "-t", buf.buf, NULL);
 	if (res)
 		goto cleanup;
 
-	res = register_dir(dir);
+	res = register_dir();
 
 cleanup:
 	free(root);
 	free(dir);
-	free(config_path);
 	strbuf_release(&buf);
 	free(branch);
 	free(cache_server_url);
@@ -863,6 +908,13 @@ cleanup:
 
 static int cmd_diagnose(int argc, const char **argv)
 {
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar diagnose [<enlistment>]"),
+		NULL
+	};
 	struct strbuf tmp_dir = STRBUF_INIT;
 	time_t now = time(NULL);
 	struct tm tm;
@@ -870,14 +922,15 @@ static int cmd_diagnose(int argc, const char **argv)
 	char *cache_server_url = NULL, *shared_cache = NULL;
 	int res = 0;
 
-	if (argc != 1)
-		die("'scalar diagnose' does not accept any arguments");
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
 	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
 			localtime_r(&now, &tm), 0, 0);
-	if (run_git(NULL, "init", "-q", "-b", "dummy",
-		    "--bare", buf.buf, NULL)) {
+	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
 		res = error(_("could not initialize temporary repository: %s"),
 			    buf.buf);
 		goto diagnose_cleanup;
@@ -947,23 +1000,35 @@ static int cmd_list(int argc, const char **argv)
 	if (argc != 1)
 		die(_("`scalar list` does not take arguments"));
 
-	return run_git(NULL, "config", "--global",
-		       "--get-all", "scalar.repo", NULL);
+	return run_git("config", "--global", "--get-all", "scalar.repo", NULL);
 }
 
 static int cmd_register(int argc, const char **argv)
 {
-	if (argc != 1 && argc != 2)
-		usage(_("scalar register [<worktree>]"));
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar register [<enlistment>]"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	/* TODO: turn `feature.scalar` into the appropriate settings */
 	/* TODO: enable FSMonitor and other forgotten settings */
 
-	return register_dir(argc < 2 ? NULL : argv[1]);
+	return register_dir();
 }
 
 static int cmd_run(int argc, const char **argv)
 {
+	struct option options[] = {
+		OPT_END(),
+	};
 	struct {
 		const char *arg, *task;
 	} tasks[] = {
@@ -974,48 +1039,70 @@ static int cmd_run(int argc, const char **argv)
 		{ "pack-files", "incremental-repack" },
 		{ NULL, NULL }
 	};
-
-	struct strbuf usage = STRBUF_INIT;
+	struct strbuf buf = STRBUF_INIT;
+	const char *usagestr[] = { NULL, NULL };
 	int i;
 
-	if (argc == 2) {
-		if (!strcmp("config", argv[1]))
-			return register_dir(NULL);
+	strbuf_addstr(&buf, N_("scalar run <task> [<enlistment>]\nTasks:\n"));
+	for (i = 0; tasks[i].arg; i++)
+		strbuf_addf(&buf, "\t%s\n", tasks[i].arg);
+	usagestr[0] = buf.buf;
 
-		if (!strcmp("all", argv[1])) {
-			if (register_dir(NULL))
-				return -1;
-			for (i = 0; tasks[i].arg; i++)
-				if (tasks[i].task &&
-				    run_git(NULL, "maintenance", "run",
-					    "--task", tasks[i].task, NULL))
-					return -1;
-			return 0;
+	argc = parse_options(argc, argv, NULL, options,
+			     usagestr, 0);
+
+	if (argc == 0)
+		usage_with_options(usagestr, options);
+
+	if (!strcmp("all", argv[0]))
+		i = -1;
+	else {
+		for (i = 0; tasks[i].arg && strcmp(tasks[i].arg, argv[0]); i++)
+			; /* keep looking for the task */
+
+		if (i > 0 && !tasks[i].arg) {
+			error(_("no such task: '%s'"), argv[0]);
+			usage_with_options(usagestr, options);
 		}
-
-		for (i = 0; tasks[i].arg; i++)
-			if (!strcmp(tasks[i].arg, argv[1]))
-				return run_git(NULL, "maintenance", "run",
-					       "--task", tasks[i].task, NULL);
-		error(_("no such task: '%s'"), argv[1]);
 	}
 
-	strbuf_addstr(&usage, N_("scalar run <task>\nTasks:\n"));
-	for (i = 0; tasks[i].arg; i++)
-		strbuf_addf(&usage, "\t%s\n", tasks[i].arg);
+	argc--;
+	argv++;
+	setup_enlistment_directory(argc, argv, usagestr, options);
+	strbuf_release(&buf);
 
-	fwrite(usage.buf, usage.len, 1, stderr);
-	strbuf_release(&usage);
+	if (i == 0)
+		return register_dir();
 
-	return -1;
+	if (i > 0)
+		return run_git("maintenance", "run",
+			       "--task", tasks[i].task, NULL);
+
+	if (register_dir())
+		return -1;
+	for (i = 1; tasks[i].arg; i++)
+		if (run_git("maintenance", "run",
+			    "--task", tasks[i].task, NULL))
+			return -1;
+	return 0;
 }
 
 static int cmd_unregister(int argc, const char **argv)
 {
-	if (argc != 1 && argc != 2)
-		usage(_("scalar unregister [<worktree>]"));
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar unregister [<enlistment>]"),
+		NULL
+	};
 
-	return unregister_dir(argc < 2 ? NULL : argv[1]);
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
+
+	return unregister_dir();
 }
 
 static int cmd_cache_server(int argc, const char **argv)
@@ -1035,7 +1122,7 @@ static int cmd_cache_server(int argc, const char **argv)
 	};
 	const char * const usage[] = {
 		N_("scalar cache_server "
-		   "[--get | --set <url> | --list [<remote>]] [<worktree>]"),
+		   "[--get | --set <url> | --list [<remote>]] [<enlistment>]"),
 		NULL
 	};
 	int res = 0;
@@ -1047,13 +1134,7 @@ static int cmd_cache_server(int argc, const char **argv)
 		usage_msg_opt(_("--get/--set/--list are mutually exclusive"),
 			      usage, options);
 
-	if (argc == 1) {
-		if (chdir(argv[0]) < 0)
-			die(_("could not switch to '%s'"), argv[0]);
-	} else if (argc > 0)
-		usage_with_options(usage, options);
-
-	setup_git_directory();
+	setup_enlistment_directory(argc, argv, usage, options);
 
 	if (list) {
 		const char *name = list, *url = list;
@@ -1078,10 +1159,10 @@ static int cmd_cache_server(int argc, const char **argv)
 			}
 			url = remote->url[0];
 		}
-		res = supports_gvfs_protocol(NULL, url, NULL);
+		res = supports_gvfs_protocol(url, NULL);
 		free(list);
 	} else if (set) {
-		res = set_config(NULL, "gvfs.cache-server=%s", set);
+		res = set_config("gvfs.cache-server=%s", set);
 		free(set);
 	} else {
 		char *url = NULL;
@@ -1100,7 +1181,7 @@ static int cmd_test(int argc, const char **argv)
 	const char *url = argc > 1 ? argv[1] :
 		"https://dev.azure.com/gvfs/ci/_git/ForTests";
 	char *p = NULL;
-	int res = supports_gvfs_protocol(NULL, url, &p);
+	int res = supports_gvfs_protocol(url, &p);
 
 	printf("resolve: %d, %s\n", res, p);
 
@@ -1110,16 +1191,15 @@ static int cmd_test(int argc, const char **argv)
 struct {
 	const char *name;
 	int (*fn)(int, const char **);
-	int needs_git_repo;
 } builtins[] = {
-	{ "clone", cmd_clone, 0 },
-	{ "list", cmd_list, 0 },
-	{ "register", cmd_register, 1 },
-	{ "unregister", cmd_unregister, 1 },
-	{ "run", cmd_run, 1 },
-	{ "diagnose", cmd_diagnose, 1 },
-	{ "cache-server", cmd_cache_server, 0 },
-	{ "test", cmd_test, 0 },
+	{ "clone", cmd_clone },
+	{ "list", cmd_list },
+	{ "register", cmd_register },
+	{ "unregister", cmd_unregister },
+	{ "run", cmd_run },
+	{ "diagnose", cmd_diagnose },
+	{ "cache-server", cmd_cache_server },
+	{ "test", cmd_test },
 	{ NULL, NULL},
 };
 
@@ -1158,11 +1238,8 @@ int cmd_main(int argc, const char **argv)
 		argc--;
 
 		for (i = 0; builtins[i].name; i++)
-			if (!strcmp(builtins[i].name, argv[0])) {
-				if (builtins[i].needs_git_repo)
-					setup_git_directory();
+			if (!strcmp(builtins[i].name, argv[0]))
 				return builtins[i].fn(argc, argv);
-			}
 	}
 
 	strbuf_addstr(&scalar_usage,
