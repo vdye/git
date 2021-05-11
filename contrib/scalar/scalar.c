@@ -426,7 +426,7 @@ static int get_disk_info(struct strbuf *out)
 }
 
 /* printf-style interface, expects `<key>=<value>` argument */
-static int set_config(const char *file, const char *fmt, ...)
+static int set_config(const char *fmt, ...)
 {
 	struct strbuf buf = STRBUF_INIT;
 	char *value;
@@ -440,7 +440,7 @@ static int set_config(const char *file, const char *fmt, ...)
 	value = strchr(buf.buf, '=');
 	if (value)
 		*(value++) = '\0';
-	res = git_config_set_in_file_gently(file, buf.buf, value);
+	res = git_config_set_gently(buf.buf, value);
 	strbuf_release(&buf);
 
 	return res;
@@ -811,7 +811,7 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	shared_cache_path = xstrfmt("%s/%s", local_cache_root, cache_key);
-	if (set_config(NULL, "gvfs.sharedCache=%s", shared_cache_path)) {
+	if (set_config("gvfs.sharedCache=%s", shared_cache_path)) {
 		res = error(_("could not configure shared cache"));
 		goto cleanup;
 	}
@@ -826,8 +826,8 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
-	if (set_config(NULL, "remote.origin.url=%s", url) ||
-	    set_config(NULL, "remote.origin.fetch="
+	if (set_config("remote.origin.url=%s", url) ||
+	    set_config("remote.origin.fetch="
 		    "+refs/heads/%s:refs/remotes/origin/%s",
 		    single_branch ? branch : "*",
 		    single_branch ? branch : "*")) {
@@ -837,22 +837,20 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (cache_server_url ||
 	    supports_gvfs_protocol(NULL, url, &cache_server_url)) {
-		if (set_config(NULL, "core.useGVFSHelper=true") ||
-		    set_config(NULL, "core.gvfs=150")) {
+		if (set_config("core.useGVFSHelper=true") ||
+		    set_config("core.gvfs=150")) {
 			res = error(_("could not turn on GVFS helper"));
 			goto cleanup;
 		}
 		if (cache_server_url &&
-		    set_config(NULL,
-			       "gvfs.cache-server=%s", cache_server_url)) {
+		    set_config("gvfs.cache-server=%s", cache_server_url)) {
 			res = error(_("could not configure cache server"));
 			goto cleanup;
 		}
 	} else {
-		if (set_config(NULL, "core.useGVFSHelper=false") ||
-		    set_config(NULL, "remote.origin.promisor=true") ||
-		    set_config(NULL,
-			       "remote.origin.partialCloneFilter=blob:none")) {
+		if (set_config("core.useGVFSHelper=false") ||
+		    set_config("remote.origin.promisor=true") ||
+		    set_config("remote.origin.partialCloneFilter=blob:none")) {
 			res = error(_("could not configure partial clone in "
 				      "'%s'"), dir);
 			goto cleanup;
@@ -874,8 +872,8 @@ static int cmd_clone(int argc, const char **argv)
 	if ((res = run_git(NULL, "fetch", "--quiet", "origin", NULL))) {
 		warning(_("Partial clone failed; Trying full clone"));
 
-		if (set_config(NULL, "remote.origin.promisor") ||
-		    set_config(NULL, "remote.origin.partialCloneFilter")) {
+		if (set_config("remote.origin.promisor") ||
+		    set_config("remote.origin.partialCloneFilter")) {
 			res = error(_("could not configure for full clone"));
 			goto cleanup;
 		}
@@ -884,9 +882,9 @@ static int cmd_clone(int argc, const char **argv)
 			goto cleanup;
 	}
 
-	if ((res = set_config(NULL, "branch.%s.remote=origin", branch)))
+	if ((res = set_config("branch.%s.remote=origin", branch)))
 		goto cleanup;
-	if ((res = set_config(NULL, "branch.%s.merge=refs/heads/%s",
+	if ((res = set_config("branch.%s.merge=refs/heads/%s",
 			      branch, branch)))
 		goto cleanup;
 
@@ -1168,7 +1166,7 @@ static int cmd_cache_server(int argc, const char **argv)
 		res = supports_gvfs_protocol(NULL, url, NULL);
 		free(list);
 	} else if (set) {
-		res = set_config(NULL, "gvfs.cache-server=%s", set);
+		res = set_config("gvfs.cache-server=%s", set);
 		free(set);
 	} else {
 		char *url = NULL;
