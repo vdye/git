@@ -827,6 +827,9 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
+	write_file_buf(git_path("objects/info/alternates"),
+		       shared_cache_path, strlen(shared_cache_path));
+
 	if (set_config("remote.origin.url=%s", url) ||
 	    set_config("remote.origin.fetch="
 		    "+refs/heads/%s:refs/remotes/origin/%s",
