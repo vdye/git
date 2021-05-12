@@ -591,7 +591,8 @@ static int get_repository_id(struct json_iterator *it)
 	return 0;
 }
 
-static char *get_cache_key(const char *dir, const char *url)
+/* Needs to run this in a worktree; gvfs-helper requires a Git repository */
+static char *get_cache_key(const char *url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
@@ -603,7 +604,6 @@ static char *get_cache_key(const char *dir, const char *url)
 	 */
 	if (can_url_support_gvfs(url)) {
 		cp.git_cmd = 1;
-		cp.dir = dir; /* gvfs-helper requires a Git repository */
 		strvec_pushl(&cp.args, "gvfs-helper", "--remote", url,
 			     "endpoint", "vsts/info", NULL);
 		if (!pipe_command(&cp, NULL, 0, &out, 512, NULL, 0)) {
@@ -645,13 +645,12 @@ static char *get_cache_key(const char *dir, const char *url)
 	return cache_key;
 }
 
-static char *remote_default_branch(const char *dir, const char *url)
+static char *remote_default_branch(const char *url)
 {
 	struct child_process cp = CHILD_PROCESS_INIT;
 	struct strbuf out = STRBUF_INIT;
 
 	cp.git_cmd = 1;
-	cp.dir = dir;
 	strvec_pushl(&cp.args, "ls-remote", "--symref", url, "HEAD", NULL);
 	strbuf_addstr(&out, "-\n");
 	if (!pipe_command(&cp, NULL, 0, &out, 0, NULL, 0)) {
@@ -685,7 +684,6 @@ static char *remote_default_branch(const char *dir, const char *url)
 
 	child_process_init(&cp);
 	cp.git_cmd = 1;
-	cp.dir = dir;
 	strvec_pushl(&cp.args, "symbolic-ref", "--short", "HEAD", NULL);
 	if (!pipe_command(&cp, NULL, 0, &out, 0, NULL, 0)) {
 		strbuf_trim(&out);
@@ -797,13 +795,12 @@ static int cmd_clone(int argc, const char **argv)
 	trace2_data_intmax("scalar", the_repository, "unattended",
 			   is_unattended());
 
-	if (!branch &&
-	    !(branch = remote_default_branch(NULL, url))) {
+	if (!branch && !(branch = remote_default_branch(url))) {
 		res = error(_("failed to get default branch for '%s'"), url);
 		goto cleanup;
 	}
 
-	if (!(cache_key = get_cache_key(NULL, url))) {
+	if (!(cache_key = get_cache_key(url))) {
 		res = error(_("could not determine cache key for '%s'"), url);
 		goto cleanup;
 	}
@@ -928,8 +925,7 @@ static int cmd_diagnose(int argc, const char **argv)
 	setup_enlistment_directory(argc, argv, usage, options);
 
 	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
-	strbuf_addftime(&buf, "%Y%m%d_%H%M%S",
-			localtime_r(&now, &tm), 0, 0);
+	strbuf_addftime(&buf, "%Y%m%d_%H%M%S", localtime_r(&now, &tm), 0, 0);
 	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
 		res = error(_("could not initialize temporary repository: %s"),
 			    buf.buf);
