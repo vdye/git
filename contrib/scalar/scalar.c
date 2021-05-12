@@ -242,13 +242,13 @@ static int register_dir(void)
 
 static int unregister_dir(void)
 {
-	int res = stop_fsmonitor_daemon();
+	int res = toggle_maintenance(0);
 
-	if (!res)
-		res = add_or_remove_enlistment(0);
+	if (add_or_remove_enlistment(0) < 0)
+		res = -1;
 
-	if (!res)
-		res = toggle_maintenance(0);
+	if (stop_fsmonitor_daemon() < 0)
+		res = -1;
 
 	return res;
 }
