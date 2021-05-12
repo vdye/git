@@ -764,7 +764,7 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (!local_cache_root)
 		local_cache_root = default_cache_root(root);
-	else
+	else if (!is_absolute_path(local_cache_root))
 		local_cache_root = local_cache_root_abs =
 			real_pathdup(local_cache_root, 1);
 
