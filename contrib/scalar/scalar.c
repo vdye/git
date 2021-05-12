@@ -697,7 +697,7 @@ static char *remote_default_branch(const char *url)
 
 static int cmd_clone(int argc, const char **argv)
 {
-	char *branch = NULL;
+	const char *branch = NULL;
 	int no_fetch_commits_and_trees = 0, full_clone = 0, single_branch = 0;
 	char *cache_server_url = NULL, *local_cache_root = NULL;
 	struct option clone_options[] = {
@@ -895,7 +895,6 @@ cleanup:
 	free(root);
 	free(dir);
 	strbuf_release(&buf);
-	free(branch);
 	free(cache_server_url);
 	free(local_cache_root);
 	free(cache_key);
