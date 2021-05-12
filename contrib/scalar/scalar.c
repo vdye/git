@@ -242,7 +242,10 @@ static int register_dir(void)
 
 static int unregister_dir(void)
 {
-	int res = toggle_maintenance(0);
+	int res = 0;
+
+	if (toggle_maintenance(0) < 0)
+		res = -1;
 
 	if (add_or_remove_enlistment(0) < 0)
 		res = -1;
