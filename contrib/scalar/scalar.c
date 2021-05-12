@@ -700,7 +700,7 @@ static int cmd_clone(int argc, const char **argv)
 	const char *branch = NULL;
 	int no_fetch_commits_and_trees = 0, full_clone = 0, single_branch = 0;
 	const char *cache_server_url = NULL, *local_cache_root = NULL;
-	char *default_cache_server_url = NULL;
+	char *default_cache_server_url = NULL, *local_cache_root_abs = NULL;
 	struct option clone_options[] = {
 		OPT_STRING('b', "branch", &branch, N_("<branch>"),
 			   N_("branch to checkout after clone")),
@@ -761,7 +761,8 @@ static int cmd_clone(int argc, const char **argv)
 	if (!local_cache_root)
 		local_cache_root = default_cache_root(root);
 	else
-		ensure_absolute_path(&local_cache_root);
+		local_cache_root = local_cache_root_abs =
+			real_pathdup(local_cache_root, 1);
 
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
@@ -899,7 +900,7 @@ cleanup:
 	free(dir);
 	strbuf_release(&buf);
 	free(default_cache_server_url);
-	free(local_cache_root);
+	free(local_cache_root_abs);
 	free(cache_key);
 	free(shared_cache_path);
 	return res;
