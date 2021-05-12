@@ -57,7 +57,7 @@ static void setup_enlistment_directory(int argc, const char **argv,
 				break;
 			}
 
-			for (; len > 0 && !is_dir_sep(path.buf[len]); len--)
+			while (len > 0 && !is_dir_sep(path.buf[--len]))
 				; /* keep looking for parent directory */
 
 			if (!len)
