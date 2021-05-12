@@ -242,13 +242,13 @@ static int register_dir(void)
 
 static int unregister_dir(void)
 {
-	int res = stop_fsmonitor_daemon();
+	int res = toggle_maintenance(0);
 
-	if (!res)
-		res = add_or_remove_enlistment(0);
+	if (add_or_remove_enlistment(0) < 0)
+		res = -1;
 
-	if (!res)
-		res = toggle_maintenance(0);
+	if (stop_fsmonitor_daemon() < 0)
+		res = -1;
 
 	return res;
 }
@@ -602,7 +602,8 @@ static char *get_cache_key(const char *url)
 	 * The GVFS protocol is only supported via https://; For testing, we
 	 * also allow http://.
 	 */
-	if (can_url_support_gvfs(url)) {
+	if (!git_env_bool("SCALAR_TEST_SKIP_VSTS_INFO", 0) &&
+	    can_url_support_gvfs(url)) {
 		cp.git_cmd = 1;
 		strvec_pushl(&cp.args, "gvfs-helper", "--remote", url,
 			     "endpoint", "vsts/info", NULL);
