@@ -242,7 +242,10 @@ static int register_dir(void)
 
 static int unregister_dir(void)
 {
-	int res = toggle_maintenance(0);
+	int res = 0;
+
+	if (toggle_maintenance(0) < 0)
+		res = -1;
 
 	if (add_or_remove_enlistment(0) < 0)
 		res = -1;
@@ -761,7 +764,7 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (!local_cache_root)
 		local_cache_root = default_cache_root(root);
-	else
+	else if (!is_absolute_path(local_cache_root))
 		local_cache_root = local_cache_root_abs =
 			real_pathdup(local_cache_root, 1);
 
@@ -823,6 +826,9 @@ static int cmd_clone(int argc, const char **argv)
 		res = error_errno(_("could not initialize '%s'"), buf.buf);
 		goto cleanup;
 	}
+
+	write_file_buf(git_path("objects/info/alternates"),
+		       shared_cache_path, strlen(shared_cache_path));
 
 	if (set_config("remote.origin.url=%s", url) ||
 	    set_config("remote.origin.fetch="
