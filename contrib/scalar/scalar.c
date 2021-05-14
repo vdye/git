@@ -114,16 +114,17 @@ static int is_non_empty_dir(const char *path)
 	return 0;
 }
 
-static void ensure_absolute_path(char **p)
+static const char *ensure_absolute_path(const char *path, char **absolute)
 {
-	char *absolute;
+	struct strbuf buf = STRBUF_INIT;
 
-	if (is_absolute_path(*p))
-		return;
+	if (is_absolute_path(path))
+		return path;
 
-	absolute = real_pathdup(*p, 1);
-	free(*p);
-	*p = absolute;
+	strbuf_realpath_forgiving(&buf, path, 1);
+	free(*absolute);
+	*absolute = strbuf_detach(&buf, NULL);
+	return *absolute;
 }
 
 static int set_recommended_config(void)
@@ -769,15 +770,16 @@ static int cmd_clone(int argc, const char **argv)
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
-	ensure_absolute_path(&root);
+	ensure_absolute_path(root, &root);
 
 	dir = xstrfmt("%s/src", root);
 
 	if (!local_cache_root)
-		local_cache_root = default_cache_root(root);
-	else if (!is_absolute_path(local_cache_root))
 		local_cache_root = local_cache_root_abs =
-			real_pathdup(local_cache_root, 1);
+			default_cache_root(root);
+	else
+		local_cache_root = ensure_absolute_path(local_cache_root,
+							&local_cache_root_abs);
 
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
