@@ -1019,7 +1019,9 @@ static int cmd_list(int argc, const char **argv)
 	if (argc != 1)
 		die(_("`scalar list` does not take arguments"));
 
-	return run_git("config", "--global", "--get-all", "scalar.repo", NULL);
+	if (run_git("config", "--global", "--get-all", "scalar.repo", NULL) < 0)
+		return -1;
+	return 0;
 }
 
 static int cmd_register(int argc, const char **argv)
