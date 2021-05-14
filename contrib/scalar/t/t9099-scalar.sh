@@ -154,4 +154,19 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 	)
 '
 
+test_expect_success 'scalar unregister' '
+	git init poof/src &&
+	scalar register poof/src &&
+	git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/poof/src" &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/poof/src" scalar.repos &&
+	rm -rf poof/src/.git &&
+	scalar unregister poof &&
+	test_must_fail git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/poof/src" &&
+	scalar list >scalar.repos &&
+	! grep -F "$(pwd)/poof/src" scalar.repos
+'
+
 test_done

@@ -114,16 +114,17 @@ static int is_non_empty_dir(const char *path)
 	return 0;
 }
 
-static void ensure_absolute_path(char **p)
+static const char *ensure_absolute_path(const char *path, char **absolute)
 {
-	char *absolute;
+	struct strbuf buf = STRBUF_INIT;
 
-	if (is_absolute_path(*p))
-		return;
+	if (is_absolute_path(path))
+		return path;
 
-	absolute = real_pathdup(*p, 1);
-	free(*p);
-	*p = absolute;
+	strbuf_realpath_forgiving(&buf, path, 1);
+	free(*absolute);
+	*absolute = strbuf_detach(&buf, NULL);
+	return *absolute;
 }
 
 static int set_recommended_config(void)
@@ -215,16 +216,27 @@ static int add_or_remove_enlistment(int add)
 
 static int stop_fsmonitor_daemon(void)
 {
-	int res = 0;
-
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	res = run_git("fsmonitor--daemon", "--stop", NULL);
+	struct strbuf err = STRBUF_INIT;
+	struct child_process cp = CHILD_PROCESS_INIT;
 
-	if (res == 1 && fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
-		res = error(_("could not stop the FSMonitor daemon"));
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "fsmonitor--daemon", "--stop", NULL);
+	if (!pipe_command(&cp, NULL, 0, NULL, 0, &err, 0)) {
+		strbuf_release(&err);
+		return 0;
+	}
+
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING) {
+		write_in_full(2, err.buf, err.len);
+		strbuf_release(&err);
+		return error(_("could not stop the FSMonitor daemon"));
+	}
+
+	strbuf_release(&err);
 #endif
 
-	return res;
+	return 0;
 }
 
 static int register_dir(void)
@@ -758,15 +770,16 @@ static int cmd_clone(int argc, const char **argv)
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
-	ensure_absolute_path(&root);
+	ensure_absolute_path(root, &root);
 
 	dir = xstrfmt("%s/src", root);
 
 	if (!local_cache_root)
-		local_cache_root = default_cache_root(root);
-	else if (!is_absolute_path(local_cache_root))
 		local_cache_root = local_cache_root_abs =
-			real_pathdup(local_cache_root, 1);
+			default_cache_root(root);
+	else
+		local_cache_root = ensure_absolute_path(local_cache_root,
+							&local_cache_root_abs);
 
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
@@ -1006,7 +1019,9 @@ static int cmd_list(int argc, const char **argv)
 	if (argc != 1)
 		die(_("`scalar list` does not take arguments"));
 
-	return run_git("config", "--global", "--get-all", "scalar.repo", NULL);
+	if (run_git("config", "--global", "--get-all", "scalar.repo", NULL) < 0)
+		return -1;
+	return 0;
 }
 
 static int cmd_register(int argc, const char **argv)
@@ -1105,6 +1120,37 @@ static int cmd_unregister(int argc, const char **argv)
 
 	argc = parse_options(argc, argv, NULL, options,
 			     usage, 0);
+
+	/*
+	 * Be forgiving when the enlistment or worktree does not even exist any
+	 * longer; This can be the case if a user deleted the worktree by
+	 * mistake and _still_ wants to unregister the thing.
+	 */
+	if (argc == 1) {
+		struct strbuf path = STRBUF_INIT;
+
+		strbuf_addf(&path, "%s/src/.git", argv[0]);
+		if (!is_directory(path.buf)) {
+			int res = 0;
+
+			strbuf_strip_suffix(&path, "/.git");
+			strbuf_realpath_forgiving(&path, path.buf, 1);
+
+			if (run_git("config", "--global",
+				    "--unset", "--fixed-value",
+				    "scalar.repo", path.buf, NULL) < 0)
+				res = -1;
+
+			if (run_git("config", "--global",
+				    "--unset", "--fixed-value",
+				    "maintenance.repo", path.buf, NULL) < 0)
+				res = -1;
+
+			strbuf_release(&path);
+			return res;
+		}
+		strbuf_release(&path);
+	}
 
 	setup_enlistment_directory(argc, argv, usage, options);
 
@@ -1245,7 +1291,7 @@ int cmd_main(int argc, const char **argv)
 
 		for (i = 0; builtins[i].name; i++)
 			if (!strcmp(builtins[i].name, argv[0]))
-				return builtins[i].fn(argc, argv);
+				return !!builtins[i].fn(argc, argv);
 	}
 
 	strbuf_addstr(&scalar_usage,
