@@ -216,11 +216,23 @@ static int add_or_remove_enlistment(int add)
 static int stop_fsmonitor_daemon(void)
 {
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	if (!run_git("fsmonitor--daemon", "--stop", NULL))
-		return 0;
+	struct strbuf err = STRBUF_INIT;
+	struct child_process cp = CHILD_PROCESS_INIT;
 
-	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "fsmonitor--daemon", "--stop", NULL);
+	if (!pipe_command(&cp, NULL, 0, NULL, 0, &err, 0)) {
+		strbuf_release(&err);
+		return 0;
+	}
+
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING) {
+		write_in_full(2, err.buf, err.len);
+		strbuf_release(&err);
 		return error(_("could not stop the FSMonitor daemon"));
+	}
+
+	strbuf_release(&err);
 #endif
 
 	return 0;
