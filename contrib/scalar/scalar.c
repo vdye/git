@@ -215,16 +215,15 @@ static int add_or_remove_enlistment(int add)
 
 static int stop_fsmonitor_daemon(void)
 {
-	int res = 0;
-
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-	res = run_git("fsmonitor--daemon", "--stop", NULL);
+	if (!run_git("fsmonitor--daemon", "--stop", NULL))
+		return 0;
 
-	if (res == 1 && fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
-		res = error(_("could not stop the FSMonitor daemon"));
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING)
+		return error(_("could not stop the FSMonitor daemon"));
 #endif
 
-	return res;
+	return 0;
 }
 
 static int register_dir(void)
