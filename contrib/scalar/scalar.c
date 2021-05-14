@@ -1260,7 +1260,7 @@ int cmd_main(int argc, const char **argv)
 
 		for (i = 0; builtins[i].name; i++)
 			if (!strcmp(builtins[i].name, argv[0]))
-				return builtins[i].fn(argc, argv);
+				return !!builtins[i].fn(argc, argv);
 	}
 
 	strbuf_addstr(&scalar_usage,
