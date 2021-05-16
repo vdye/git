@@ -780,7 +780,7 @@ static int cmd_clone(int argc, const char **argv)
 		NULL
 	};
 	const char *url;
-	char *root = NULL, *dir = NULL;
+	char *enlistment = NULL, *dir = NULL;
 	char *cache_key = NULL, *shared_cache_path = NULL;
 	struct strbuf buf = STRBUF_INIT;
 	int res;
@@ -789,7 +789,7 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (argc == 2) {
 		url = argv[0];
-		root = xstrdup(argv[1]);
+		enlistment = xstrdup(argv[1]);
 	} else if (argc == 1) {
 		url = argv[0];
 
@@ -800,18 +800,18 @@ static int cmd_clone(int argc, const char **argv)
 		/* Strip suffix `.git`, if any */
 		strbuf_strip_suffix(&buf, ".git");
 
-		root = find_last_dir_sep(buf.buf);
-		if (!root) {
+		enlistment = find_last_dir_sep(buf.buf);
+		if (!enlistment) {
 			die(_("cannot deduce worktree name from '%s'"), url);
 		}
-		root = xstrdup(root + 1);
+		enlistment = xstrdup(enlistment + 1);
 	} else {
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
 	ensure_absolute_path(root, &root);
 
-	dir = xstrfmt("%s/src", root);
+	dir = xstrfmt("%s/src", enlistment);
 
 	if (!local_cache_root)
 		local_cache_root = local_cache_root_abs =
@@ -961,7 +961,7 @@ static int cmd_clone(int argc, const char **argv)
 	res = register_dir();
 
 cleanup:
-	free(root);
+	free(enlistment);
 	free(dir);
 	strbuf_release(&buf);
 	free(default_cache_server_url);
