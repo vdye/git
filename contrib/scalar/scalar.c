@@ -89,31 +89,6 @@ static int run_git(const char *arg, ...)
 	return res;
 }
 
-static int is_non_empty_dir(const char *path)
-{
-	DIR *dir = opendir(path);
-	struct dirent *entry;
-
-	if (!dir) {
-		if (errno != ENOENT) {
-			error_errno(_("could not open directory '%s'"), path);
-		}
-		return 0;
-	}
-
-	while ((entry = readdir(dir))) {
-		const char *name = entry->d_name;
-
-		if (strcmp(name, ".") && strcmp(name, "..")) {
-			closedir(dir);
-			return 1;
-		}
-	}
-
-	closedir(dir);
-	return 0;
-}
-
 static const char *ensure_absolute_path(const char *path, char **absolute)
 {
 	struct strbuf buf = STRBUF_INIT;
@@ -809,6 +784,9 @@ static int cmd_clone(int argc, const char **argv)
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
+	if (is_directory(enlistment))
+		die(_("directory '%s' exists already"), enlistment);
+
 	ensure_absolute_path(enlistment, &enlistment);
 
 	dir = xstrfmt("%s/src", enlistment);
@@ -822,9 +800,6 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
-
-	if (is_non_empty_dir(dir))
-		die(_("'%s' exists and is not empty"), dir);
 
 	strbuf_reset(&buf);
 	if (branch)
