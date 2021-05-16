@@ -826,8 +826,17 @@ static int cmd_clone(int argc, const char **argv)
 	 * This `dir_inside_of()` call relies on git_config() having parsed the
 	 * newly-initialized repository config's `core.ignoreCase` value.
 	 */
-	if (dir_inside_of(local_cache_root, dir) >= 0)
+	if (dir_inside_of(local_cache_root, dir) >= 0) {
+		struct strbuf path = STRBUF_INIT;
+
+		strbuf_addstr(&path, enlistment);
+		if (chdir("../..") < 0 ||
+		    remove_dir_recursively(&path, 0) < 0)
+			die(_("'--local-cache-path' cannot be inside the src "
+			      "folder;\nCould not remove '%s'"), enlistment);
+
 		die(_("'--local-cache-path' cannot be inside the src folder"));
+	}
 
 	/* common-main already logs `argv` */
 	trace2_data_string("scalar", the_repository, "dir", dir);
