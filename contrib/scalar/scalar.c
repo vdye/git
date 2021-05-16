@@ -809,13 +809,13 @@ static int cmd_clone(int argc, const char **argv)
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
-	ensure_absolute_path(root, &root);
+	ensure_absolute_path(enlistment, &enlistment);
 
 	dir = xstrfmt("%s/src", enlistment);
 
 	if (!local_cache_root)
 		local_cache_root = local_cache_root_abs =
-			default_cache_root(root);
+			default_cache_root(enlistment);
 	else
 		local_cache_root = ensure_absolute_path(local_cache_root,
 							&local_cache_root_abs);
