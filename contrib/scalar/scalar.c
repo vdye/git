@@ -784,9 +784,6 @@ static int cmd_clone(int argc, const char **argv)
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
 
-	if (dir_inside_of(local_cache_root, dir) >= 0)
-		die(_("'--local-cache-path' cannot be inside the src folder"));
-
 	if (is_non_empty_dir(dir))
 		die(_("'%s' exists and is not empty"), dir);
 
@@ -808,6 +805,15 @@ static int cmd_clone(int argc, const char **argv)
 	}
 
 	setup_git_directory();
+
+	git_config(git_default_config, NULL);
+
+	/*
+	 * This `dir_inside_of()` call relies on git_config() having parsed the
+	 * newly-initialized repository config's `core.ignoreCase` value.
+	 */
+	if (dir_inside_of(local_cache_root, dir) >= 0)
+		die(_("'--local-cache-path' cannot be inside the src folder"));
 
 	/* common-main already logs `argv` */
 	trace2_data_string("scalar", the_repository, "dir", dir);
