@@ -169,4 +169,13 @@ test_expect_success 'scalar unregister' '
 	! grep -F "$(pwd)/poof/src" scalar.repos
 '
 
+test_expect_success 'scalar delete without enlistment shows a usage' '
+	test_expect_code 129 scalar delete
+'
+
+test_expect_success 'scalar delete with enlistment' '
+	scalar delete cloned &&
+	test_path_is_missing cloned
+'
+
 test_done
