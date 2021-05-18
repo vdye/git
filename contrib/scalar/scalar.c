@@ -133,12 +133,22 @@ static int set_recommended_config(void)
 		{ "receive.autoGC", "false" },
 		{ "reset.quiet", "true" },
 		{ "status.aheadBehind", "false" },
-#ifdef WIN32
-		/*
-		 * Windows-specific settings.
-		 */
+#ifndef WIN32
 		{ "core.untrackedCache", "true" },
-		{ "core.filemode", "true" },
+#else
+		/*
+		 * Unfortunately, Scalar's Functional Tests demonstrated
+		 * that the untracked cache feature is unreliable on Windows
+		 * (which is a bummer because that platform would benefit the
+		 * most from it). For some reason, freshly created files seem
+		 * not to update the directory's `lastModified` time
+		 * immediately, but the untracked cache would need to rely on
+		 * that.
+		 *
+		 * Therefore, with a sad heart, we disable this very useful
+		 * feature on Windows.
+		 */
+		{ "core.untrackedCache", "false" },
 #endif
 		{ NULL, NULL },
 	};
