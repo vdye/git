@@ -971,6 +971,8 @@ extern struct strbuf gvfs_shared_cache_pathname;
 extern int core_apply_sparse_checkout;
 extern int core_sparse_checkout_cone;
 
+extern long config_write_lock_timeout_ms;
+
 /*
  * Include broken refs in all ref iterations, which will
  * generally choke dangerous operations rather than letting
