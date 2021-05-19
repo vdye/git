@@ -24,6 +24,21 @@ test_expect_success 'scalar shows a usage' '
 	test_expect_code 129 scalar -h
 '
 
+test_expect_success 'scalar unregister' '
+	git init vanish/src &&
+	scalar register vanish/src &&
+	git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/vanish/src" &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/vanish/src" scalar.repos &&
+	rm -rf vanish/src/.git &&
+	scalar unregister vanish &&
+	test_must_fail git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/vanish/src" &&
+	scalar list >scalar.repos &&
+	! grep -F "$(pwd)/vanish/src" scalar.repos
+'
+
 test_expect_success 'set up repository to clone' '
 	test_commit first &&
 	test_commit second &&
@@ -153,22 +168,6 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 		test_cmp expect actual
 	)
 '
-
-test_expect_success 'scalar unregister' '
-	git init poof/src &&
-	scalar register poof/src &&
-	git config --get --global --fixed-value \
-		maintenance.repo "$(pwd)/poof/src" &&
-	scalar list >scalar.repos &&
-	grep -F "$(pwd)/poof/src" scalar.repos &&
-	rm -rf poof/src/.git &&
-	scalar unregister poof &&
-	test_must_fail git config --get --global --fixed-value \
-		maintenance.repo "$(pwd)/poof/src" &&
-	scalar list >scalar.repos &&
-	! grep -F "$(pwd)/poof/src" scalar.repos
-'
-
 test_expect_success 'scalar delete without enlistment shows a usage' '
 	test_expect_code 129 scalar delete
 '

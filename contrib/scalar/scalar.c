@@ -89,31 +89,6 @@ static int run_git(const char *arg, ...)
 	return res;
 }
 
-static int is_non_empty_dir(const char *path)
-{
-	DIR *dir = opendir(path);
-	struct dirent *entry;
-
-	if (!dir) {
-		if (errno != ENOENT) {
-			error_errno(_("could not open directory '%s'"), path);
-		}
-		return 0;
-	}
-
-	while ((entry = readdir(dir))) {
-		const char *name = entry->d_name;
-
-		if (strcmp(name, ".") && strcmp(name, "..")) {
-			closedir(dir);
-			return 1;
-		}
-	}
-
-	closedir(dir);
-	return 0;
-}
-
 static const char *ensure_absolute_path(const char *path, char **absolute)
 {
 	struct strbuf buf = STRBUF_INIT;
@@ -158,12 +133,23 @@ static int set_recommended_config(void)
 		{ "receive.autoGC", "false" },
 		{ "reset.quiet", "true" },
 		{ "status.aheadBehind", "false" },
-#ifdef WIN32
-		/*
-		 * Windows-specific settings.
-		 */
+		{ "config.writeConfigLockTimeoutMS", "150" },
+#ifndef WIN32
 		{ "core.untrackedCache", "true" },
-		{ "core.filemode", "true" },
+#else
+		/*
+		 * Unfortunately, Scalar's Functional Tests demonstrated
+		 * that the untracked cache feature is unreliable on Windows
+		 * (which is a bummer because that platform would benefit the
+		 * most from it). For some reason, freshly created files seem
+		 * not to update the directory's `lastModified` time
+		 * immediately, but the untracked cache would need to rely on
+		 * that.
+		 *
+		 * Therefore, with a sad heart, we disable this very useful
+		 * feature on Windows.
+		 */
+		{ "core.untrackedCache", "false" },
 #endif
 		{ NULL, NULL },
 	};
@@ -189,15 +175,24 @@ static int set_recommended_config(void)
 
 static int toggle_maintenance(int enable)
 {
+	unsigned long ul;
+
+	if (git_config_get_ulong("config.writeConfigLockTimeoutMS", &ul))
+		git_config_push_parameter("config.writeConfigLockTimeoutMS=150");
+
 	return run_git("maintenance", enable ? "start" : "unregister", NULL);
 }
 
 static int add_or_remove_enlistment(int add)
 {
 	int res;
+	unsigned long ul;
 
 	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
+
+	if (git_config_get_ulong("config.writeConfigLockTimeoutMS", &ul))
+		git_config_push_parameter("config.writeConfigLockTimeoutMS=150");
 
 	res = run_git("config", "--global", "--get", "--fixed-value",
 		      "scalar.repo", the_repository->worktree, NULL);
@@ -780,7 +775,7 @@ static int cmd_clone(int argc, const char **argv)
 		NULL
 	};
 	const char *url;
-	char *root = NULL, *dir = NULL;
+	char *enlistment = NULL, *dir = NULL;
 	char *cache_key = NULL, *shared_cache_path = NULL;
 	struct strbuf buf = STRBUF_INIT;
 	int res;
@@ -789,7 +784,7 @@ static int cmd_clone(int argc, const char **argv)
 
 	if (argc == 2) {
 		url = argv[0];
-		root = xstrdup(argv[1]);
+		enlistment = xstrdup(argv[1]);
 	} else if (argc == 1) {
 		url = argv[0];
 
@@ -800,31 +795,31 @@ static int cmd_clone(int argc, const char **argv)
 		/* Strip suffix `.git`, if any */
 		strbuf_strip_suffix(&buf, ".git");
 
-		root = find_last_dir_sep(buf.buf);
-		if (!root) {
+		enlistment = find_last_dir_sep(buf.buf);
+		if (!enlistment) {
 			die(_("cannot deduce worktree name from '%s'"), url);
 		}
-		root = xstrdup(root + 1);
+		enlistment = xstrdup(enlistment + 1);
 	} else {
 		usage_msg_opt(N_("need a URL"), clone_usage, clone_options);
 	}
 
-	ensure_absolute_path(root, &root);
+	if (is_directory(enlistment))
+		die(_("directory '%s' exists already"), enlistment);
 
-	dir = xstrfmt("%s/src", root);
+	ensure_absolute_path(enlistment, &enlistment);
+
+	dir = xstrfmt("%s/src", enlistment);
 
 	if (!local_cache_root)
 		local_cache_root = local_cache_root_abs =
-			default_cache_root(root);
+			default_cache_root(enlistment);
 	else
 		local_cache_root = ensure_absolute_path(local_cache_root,
 							&local_cache_root_abs);
 
 	if (!local_cache_root)
 		die(_("could not determine local cache root"));
-
-	if (is_non_empty_dir(dir))
-		die(_("'%s' exists and is not empty"), dir);
 
 	strbuf_reset(&buf);
 	if (branch)
@@ -851,8 +846,17 @@ static int cmd_clone(int argc, const char **argv)
 	 * This `dir_inside_of()` call relies on git_config() having parsed the
 	 * newly-initialized repository config's `core.ignoreCase` value.
 	 */
-	if (dir_inside_of(local_cache_root, dir) >= 0)
+	if (dir_inside_of(local_cache_root, dir) >= 0) {
+		struct strbuf path = STRBUF_INIT;
+
+		strbuf_addstr(&path, enlistment);
+		if (chdir("../..") < 0 ||
+		    remove_dir_recursively(&path, 0) < 0)
+			die(_("'--local-cache-path' cannot be inside the src "
+			      "folder;\nCould not remove '%s'"), enlistment);
+
 		die(_("'--local-cache-path' cannot be inside the src folder"));
+	}
 
 	/* common-main already logs `argv` */
 	trace2_data_string("scalar", the_repository, "dir", dir);
@@ -961,7 +965,7 @@ static int cmd_clone(int argc, const char **argv)
 	res = register_dir();
 
 cleanup:
-	free(root);
+	free(enlistment);
 	free(dir);
 	strbuf_release(&buf);
 	free(default_cache_server_url);
