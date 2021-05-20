@@ -3044,7 +3044,7 @@ int git_config_set_multivar_in_file_gently(const char *config_filename,
 		config_filename = filename_buf = git_pathdup("config");
 
 	if ((long)timeout_ms < 0 &&
-	    git_config_get_ulong("core.writeConfigLockTimeoutMS", &timeout_ms))
+	    git_config_get_ulong("core.configWriteLockTimeoutMS", &timeout_ms))
 		timeout_ms = 0;
 
 	/*
