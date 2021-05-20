@@ -932,11 +932,6 @@ static int cmd_clone(int argc, const char **argv)
 	if (set_recommended_config())
 		return error(_("could not configure '%s'"), dir);
 
-	/*
-	 * TODO: should we pipe the output and grep for "filtering not
-	 * recognized by server", and suppress the error output in
-	 * that case?
-	 */
 	if ((res = run_git("fetch", "--quiet", "origin", NULL))) {
 		warning(_("Partial clone failed; Trying full clone"));
 
