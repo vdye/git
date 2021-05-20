@@ -133,7 +133,7 @@ static int set_recommended_config(void)
 		{ "receive.autoGC", "false" },
 		{ "reset.quiet", "true" },
 		{ "status.aheadBehind", "false" },
-		{ "core.writeConfigLockTimeoutMS", "150" },
+		{ "core.configWriteLockTimeoutMS", "150" },
 #ifndef WIN32
 		{ "core.untrackedCache", "true" },
 #else
@@ -177,8 +177,8 @@ static int toggle_maintenance(int enable)
 {
 	unsigned long ul;
 
-	if (git_config_get_ulong("core.writeConfigLockTimeoutMS", &ul))
-		git_config_push_parameter("core.writeConfigLockTimeoutMS=150");
+	if (git_config_get_ulong("core.configWriteLockTimeoutMS", &ul))
+		git_config_push_parameter("core.configWriteLockTimeoutMS=150");
 
 	return run_git("maintenance", enable ? "start" : "unregister", NULL);
 }
@@ -191,8 +191,8 @@ static int add_or_remove_enlistment(int add)
 	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
 
-	if (git_config_get_ulong("core.writeConfigLockTimeoutMS", &ul))
-		git_config_push_parameter("core.writeConfigLockTimeoutMS=150");
+	if (git_config_get_ulong("core.configWriteLockTimeoutMS", &ul))
+		git_config_push_parameter("core.configWriteLockTimeoutMS=150");
 
 	res = run_git("config", "--global", "--get", "--fixed-value",
 		      "scalar.repo", the_repository->worktree, NULL);
