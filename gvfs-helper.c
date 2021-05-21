@@ -2830,7 +2830,7 @@ static void set_cache_server_creds_on_slot(struct active_request_slot *slot,
 	 * [b] If we want to talk to a cache-server, we have get the
 	 *     Basic Auth creds for the main server.  And this may be
 	 *     problematic if the libcurl and/or the credential manager
-	 *     insists on using NTML and prevents us from getting them.
+	 *     insists on using NTLM and prevents us from getting them.
 	 *
 	 * So we never try AUTH-ANY and force Basic Auth (if possible).
 	 */
