@@ -1334,7 +1334,7 @@ static void do__http_get__gvfs_config(struct gh__response_status *status,
 /*
  * Find the URL of the cache-server, if we have one.
  *
- * This routined is called by the initialization code and is allowed
+ * This routine is called by the initialization code and is allowed
  * to call die() rather than returning an 'ec'.
  */
 static void select_cache_server(void)
