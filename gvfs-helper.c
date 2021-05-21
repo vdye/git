@@ -2451,7 +2451,7 @@ static void install_result(struct gh__request_params *params,
 	if (params->objects_mode == GH__OBJECTS_MODE__PREFETCH) {
 		/*
 		 * The "gvfs/prefetch" API is the only thing that sends
-		 * these multi-part packfiles.  According to the procotol
+		 * these multi-part packfiles.  According to the protocol
 		 * documentation, they will have this x- content type.
 		 *
 		 * However, it appears that there is a BUG in the origin
@@ -3309,7 +3309,7 @@ static void cb_find_last(const char *full_path, size_t full_path_len,
  * TODO
  * TODO Since each cache-server maintains its own set of prefetch
  * TODO packs (such that 2 requests may hit 2 different
- * TODO load-balanced servers and get different anwsers (with or
+ * TODO load-balanced servers and get different answers (with or
  * TODO without clock-skew issues)), is it possible for us to miss
  * TODO the absolute fringe of new commits and trees?
  * TODO
