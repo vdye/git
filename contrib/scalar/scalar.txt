@@ -16,8 +16,8 @@ scalar register [<enlistment>]
 scalar unregister [<enlistment>]
 scalar run ( all | config | commit-graph | fetch | loose-objects | pack-files ) [<enlistment>]
 scalar diagnose [<enlistment>]
-scalar cache-server ( --get | --set <url> | --list [<remote>] ) [<enlistment>]
 scalar delete <enlistment>
+scalar cache-server ( --get | --set <url> | --list [<remote>] ) [<enlistment>]
 
 DESCRIPTION
 -----------
@@ -153,6 +153,14 @@ diagnose [<enlistment>]::
 The output of this command is a `.zip` file that is written into
 a directory adjacent to the worktree in the `src` directory.
 
+Delete
+~~~~~~
+
+delete <enlistment>::
+    This command lets you delete an existing Scalar enlistment from your
+    local file system, unregistering the repository and stopping any file
+    watcher daemons (FSMonitor).
+
 Cache-server
 ~~~~~~~~~~~~
 
@@ -173,14 +181,6 @@ repository), this command mode triggers a request via the network that
 potentially requires authentication. If authentication is required, the
 configured credential helper is employed (see linkgit:git-credential[1]
 for details).
-
-Delete
-~~~~~~
-
-delete <enlistment>::
-    This command lets you delete an existing Scalar enlistment from your
-    local file system, unregistering the repository and stopping any file
-    watcher daemons (FSMonitor).
 
 SEE ALSO
 --------
