@@ -1257,7 +1257,7 @@ static int option_parse_shared_cache_directory(const struct option *opt,
 	else if (!gvfs_shared_cache_pathname.len) {
 		/*
 		 * A shared-cache was requested and we did not inherit one.
-		 * Try it, but let alt_odb_usabe() secretly disable it if
+		 * Try it, but let alt_odb_usable() secretly disable it if
 		 * it cannot create the directory on disk.
 		 */
 		strbuf_addbuf(&gvfs_shared_cache_pathname, &buf_arg);
@@ -1284,7 +1284,7 @@ static int option_parse_shared_cache_directory(const struct option *opt,
 		add_to_alternates_memory(buf_arg.buf);
 
 		/*
-		 * alt_odb_usabe() releases gvfs_shared_cache_pathname
+		 * alt_odb_usable() releases gvfs_shared_cache_pathname
 		 * if it cannot create the directory on disk, so fallback
 		 * to the previous choice when it fails.
 		 */
