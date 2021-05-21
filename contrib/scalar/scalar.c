@@ -1207,6 +1207,74 @@ static int cmd_unregister(int argc, const char **argv)
 	return unregister_dir();
 }
 
+static int cmd_delete(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar delete <enlistment>"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	if (argc != 1)
+		usage_with_options(usage, options);
+
+	setup_enlistment_directory(argc, argv, usage, options);
+
+	return delete_enlistment();
+}
+
+static int cmd_help(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar help"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	if (argc != 0)
+		usage_with_options(usage, options);
+
+	return run_git("help", "scalar", NULL);
+}
+
+static int cmd_version(int argc, const char **argv)
+{
+	int verbose = 0, build_options = 0;
+	struct option options[] = {
+		OPT__VERBOSE(&verbose, N_("include Git version")),
+		OPT_BOOL(0, "build-options", &build_options,
+			 N_("include Git's build options")),
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar verbose [-v | --verbose] [--build-options]"),
+		NULL
+	};
+	struct strbuf buf = STRBUF_INIT;
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	if (argc != 0)
+		usage_with_options(usage, options);
+
+	get_version_info(&buf, build_options);
+	fprintf(stderr, "%s\n", buf.buf);
+	strbuf_release(&buf);
+
+	return 0;
+}
+
 static int cmd_cache_server(int argc, const char **argv)
 {
 	int get = 0;
@@ -1278,74 +1346,6 @@ static int cmd_cache_server(int argc, const char **argv)
 	return !!res;
 }
 
-static int cmd_delete(int argc, const char **argv)
-{
-	struct option options[] = {
-		OPT_END(),
-	};
-	const char * const usage[] = {
-		N_("scalar delete <enlistment>"),
-		NULL
-	};
-
-	argc = parse_options(argc, argv, NULL, options,
-			     usage, 0);
-
-	if (argc != 1)
-		usage_with_options(usage, options);
-
-	setup_enlistment_directory(argc, argv, usage, options);
-
-	return delete_enlistment();
-}
-
-static int cmd_help(int argc, const char **argv)
-{
-	struct option options[] = {
-		OPT_END(),
-	};
-	const char * const usage[] = {
-		N_("scalar help"),
-		NULL
-	};
-
-	argc = parse_options(argc, argv, NULL, options,
-			     usage, 0);
-
-	if (argc != 0)
-		usage_with_options(usage, options);
-
-	return run_git("help", "scalar", NULL);
-}
-
-static int cmd_version(int argc, const char **argv)
-{
-	int verbose = 0, build_options = 0;
-	struct option options[] = {
-		OPT__VERBOSE(&verbose, N_("include Git version")),
-		OPT_BOOL(0, "build-options", &build_options,
-			 N_("include Git's build options")),
-		OPT_END(),
-	};
-	const char * const usage[] = {
-		N_("scalar verbose [-v | --verbose] [--build-options]"),
-		NULL
-	};
-	struct strbuf buf = STRBUF_INIT;
-
-	argc = parse_options(argc, argv, NULL, options,
-			     usage, 0);
-
-	if (argc != 0)
-		usage_with_options(usage, options);
-
-	get_version_info(&buf, build_options);
-	fprintf(stderr, "%s\n", buf.buf);
-	strbuf_release(&buf);
-
-	return 0;
-}
-
 static int cmd_test(int argc, const char **argv)
 {
 	const char *url = argc > 1 ? argv[1] :
@@ -1368,10 +1368,10 @@ struct {
 	{ "unregister", cmd_unregister },
 	{ "run", cmd_run },
 	{ "diagnose", cmd_diagnose },
-	{ "cache-server", cmd_cache_server },
 	{ "delete", cmd_delete },
 	{ "help", cmd_help },
 	{ "version", cmd_version },
+	{ "cache-server", cmd_cache_server },
 	{ "test", cmd_test },
 	{ NULL, NULL},
 };

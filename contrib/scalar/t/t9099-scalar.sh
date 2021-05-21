@@ -85,6 +85,15 @@ test_expect_success UNZIP 'scalar diagnose' '
 	test_file_not_empty out
 '
 
+test_expect_success 'scalar delete without enlistment shows a usage' '
+	test_expect_code 129 scalar delete
+'
+
+test_expect_success 'scalar delete with enlistment' '
+	scalar delete cloned &&
+	test_path_is_missing cloned
+'
+
 GIT_TEST_ALLOW_GVFS_VIA_HTTP=1
 export GIT_TEST_ALLOW_GVFS_VIA_HTTP
 
@@ -167,14 +176,6 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 		echo "second" >expect &&
 		test_cmp expect actual
 	)
-'
-test_expect_success 'scalar delete without enlistment shows a usage' '
-	test_expect_code 129 scalar delete
-'
-
-test_expect_success 'scalar delete with enlistment' '
-	scalar delete cloned &&
-	test_path_is_missing cloned
 '
 
 test_done
