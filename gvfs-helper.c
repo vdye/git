@@ -130,7 +130,7 @@
 //            Interactive verb: objects.get
 //
 //                 Fetch 1 or more objects, one at a time, using a
-//                 "/gvfs/ojbects" GET requests.
+//                 "/gvfs/objects" GET requests.
 //
 //                 Each object will be created as a loose object in the ODB.
 //
