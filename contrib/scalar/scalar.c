@@ -116,6 +116,12 @@ static int set_recommended_config(void)
 		{ "core.multiPackIndex", "true" },
 		{ "core.preloadIndex", "true" },
 		{ "core.safeCRLF", "false" },
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+		/*
+		 * Enable the built-in FSMonitor on supported platforms.
+		 */
+		{ "core.useBuiltinFSMonitor", "true" },
+#endif
 		{ "credential.validate", "false" },
 		{ "feature.manyFiles", "false" },
 		{ "feature.experimental", "false" },
@@ -209,6 +215,31 @@ static int add_or_remove_enlistment(int add)
 		       "scalar.repo", the_repository->worktree, NULL);
 }
 
+static int start_fsmonitor_daemon(void)
+{
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+	struct strbuf err = STRBUF_INIT;
+	struct child_process cp = CHILD_PROCESS_INIT;
+
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "fsmonitor--daemon", "--start", NULL);
+	if (!pipe_command(&cp, NULL, 0, NULL, 0, &err, 0)) {
+		strbuf_release(&err);
+		return 0;
+	}
+
+	if (fsmonitor_ipc__get_state() != IPC_STATE__LISTENING) {
+		write_in_full(2, err.buf, err.len);
+		strbuf_release(&err);
+		return error(_("could not start the FSMonitor daemon"));
+	}
+
+	strbuf_release(&err);
+#endif
+
+	return 0;
+}
+
 static int stop_fsmonitor_daemon(void)
 {
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
@@ -243,6 +274,9 @@ static int register_dir(void)
 
 	if (!res)
 		res = toggle_maintenance(1);
+
+	if (!res)
+		res = start_fsmonitor_daemon();
 
 	return res;
 }
@@ -1088,9 +1122,6 @@ static int cmd_register(int argc, const char **argv)
 			     usage, 0);
 
 	setup_enlistment_directory(argc, argv, usage, options);
-
-	/* TODO: turn `feature.scalar` into the appropriate settings */
-	/* TODO: enable FSMonitor and other forgotten settings */
 
 	return register_dir();
 }
