@@ -118,9 +118,7 @@ static int set_recommended_config(void)
 		{ "core.safeCRLF", "false" },
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
 		/*
-		 * The value proposition of Scalar is really only realized by
-		 * using FSMonitor. We choose to only support the built-in
-		 * FSMonitor, and only enable this on supported platforms.
+		 * Enable the built-in FSMonitor on supported platforms.
 		 */
 		{ "core.useBuiltinFSMonitor", "true" },
 #endif
