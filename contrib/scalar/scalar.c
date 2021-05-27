@@ -102,19 +102,20 @@ static const char *ensure_absolute_path(const char *path, char **absolute)
 	return *absolute;
 }
 
-static int set_recommended_config(void)
+static int set_recommended_config(int reconfigure)
 {
 	struct {
 		const char *key;
 		const char *value;
+		int overwrite_on_reconfigure;
 	} config[] = {
 		{ "am.keepCR", "true" },
-		{ "commitGraph.generationVersion", "1" },
+		{ "commitGraph.generationVersion", "1", 1 },
 		{ "core.autoCRLF", "false" },
 		{ "core.FSCache", "true" },
-		{ "core.logAllRefUpdates", "true" },
-		{ "core.multiPackIndex", "true" },
-		{ "core.preloadIndex", "true" },
+		{ "core.logAllRefUpdates", "true", 1 },
+		{ "core.multiPackIndex", "true", 1 },
+		{ "core.preloadIndex", "true", 1 },
 		{ "core.safeCRLF", "false" },
 #ifdef HAVE_FSMONITOR_DAEMON_BACKEND
 		/*
@@ -164,7 +165,8 @@ static int set_recommended_config(void)
 	for (i = 0; config[i].key; i++) {
 		char *value;
 
-		if (git_config_get_string(config[i].key, &value)) {
+		if ((reconfigure && config[i].overwrite_on_reconfigure) ||
+		    git_config_get_string(config[i].key, &value)) {
 			trace2_data_string("scalar", the_repository, config[i].key, "created");
 			if (git_config_set_gently(config[i].key,
 						  config[i].value) < 0)
@@ -270,7 +272,7 @@ static int register_dir(void)
 	int res = add_or_remove_enlistment(1);
 
 	if (!res)
-		res = set_recommended_config();
+		res = set_recommended_config(0);
 
 	if (!res)
 		res = toggle_maintenance(1);
@@ -963,7 +965,7 @@ static int cmd_clone(int argc, const char **argv)
 	    (res = run_git("sparse-checkout", "init", "--cone", NULL)))
 		goto cleanup;
 
-	if (set_recommended_config())
+	if (set_recommended_config(0))
 		return error(_("could not configure '%s'"), dir);
 
 	if ((res = run_git("fetch", "--quiet", "origin", NULL))) {
@@ -1220,6 +1222,24 @@ static int cmd_register(int argc, const char **argv)
 	setup_enlistment_directory(argc, argv, usage, options);
 
 	return register_dir();
+}
+
+static int cmd_reconfigure(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar reconfigure [<enlistment>]"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	setup_enlistment_directory(argc, argv, usage, options);
+
+	return set_recommended_config(1);
 }
 
 static int cmd_run(int argc, const char **argv)
@@ -1494,6 +1514,7 @@ struct {
 	{ "register", cmd_register },
 	{ "unregister", cmd_unregister },
 	{ "run", cmd_run },
+	{ "reconfigure", cmd_reconfigure },
 	{ "diagnose", cmd_diagnose },
 	{ "delete", cmd_delete },
 	{ "help", cmd_help },
