@@ -109,43 +109,14 @@ static int set_recommended_config(int reconfigure)
 		const char *value;
 		int overwrite_on_reconfigure;
 	} config[] = {
-		{ "am.keepCR", "true" },
-		{ "commitGraph.generationVersion", "1", 1 },
-		{ "core.autoCRLF", "false" },
-		{ "core.FSCache", "true" },
-		{ "core.logAllRefUpdates", "true", 1 },
+		/* Required */
+		{ "am.keepCR", "true", 1 },
+		{ "core.FSCache", "true", 1 },
 		{ "core.multiPackIndex", "true", 1 },
 		{ "core.preloadIndex", "true", 1 },
-		{ "core.safeCRLF", "false" },
-#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-		/*
-		 * Enable the built-in FSMonitor on supported platforms.
-		 */
-		{ "core.useBuiltinFSMonitor", "true" },
-#endif
-		{ "credential.validate", "false" }, /* GCM4W-only */
-		{ "credential.https://dev.azure.com.useHttpPath", "true" },
-		{ "feature.manyFiles", "false" },
-		{ "feature.experimental", "false" },
-		{ "fetch.unpackLimit", "1" },
-		{ "fetch.writeCommitGraph", "false" },
-		{ "gc.auto", "0" },
-		{ "gui.GCWarning", "false" },
-		{ "index.threads", "true" },
-		{ "index.version", "4" },
-		{ "maintenance.auto", "false" },
-		{ "merge.stat", "false" },
-		{ "merge.renames", "false" },
-		{ "pack.useBitmaps", "false" },
-		{ "pack.useSparse", "true" },
-		{ "receive.autoGC", "false" },
-		{ "reset.quiet", "true" },
-		{ "status.aheadBehind", "false" },
-		{ "core.configWriteLockTimeoutMS", "150" },
 #ifndef WIN32
-		{ "core.untrackedCache", "true" },
+		{ "core.untrackedCache", "true", 1 },
 #else
-		{ "http.sslBackend", "schannel" },
 		/*
 		 * Unfortunately, Scalar's Functional Tests demonstrated
 		 * that the untracked cache feature is unreliable on Windows
@@ -158,8 +129,47 @@ static int set_recommended_config(int reconfigure)
 		 * Therefore, with a sad heart, we disable this very useful
 		 * feature on Windows.
 		 */
-		{ "core.untrackedCache", "false" },
+		{ "core.untrackedCache", "false", 1 },
 #endif
+		{ "core.bare", "false", 1 },
+		{ "core.logAllRefUpdates", "true", 1 },
+		{ "credential.https://dev.azure.com.useHttpPath", "true", 1 },
+		{ "credential.validate", "false", 1 }, /* GCM4W-only */
+		{ "gc.auto", "0", 1 },
+		{ "gui.GCWarning", "false", 1 },
+		{ "index.threads", "true", 1 },
+		{ "index.version", "4", 1 },
+		{ "merge.stat", "false", 1 },
+		{ "merge.renames", "false", 1 },
+		{ "pack.useBitmaps", "false", 1 },
+		{ "pack.useSparse", "true", 1 },
+		{ "receive.autoGC", "false", 1 },
+		{ "reset.quiet", "true", 1 },
+		{ "feature.manyFiles", "false", 1 },
+		{ "feature.experimental", "false", 1 },
+		{ "fetch.unpackLimit", "1", 1 },
+		{ "fetch.writeCommitGraph", "false", 1 },
+#ifdef WIN32
+		{ "http.sslBackend", "schannel", 1 },
+#endif
+		/* Optional */
+		{ "status.aheadBehind", "false" },
+		{ "commitGraph.generationVersion", "1" },
+		{ "core.autoCRLF", "false" },
+		{ "core.safeCRLF", "false" },
+		{ "maintenance.gc.enabled", "false" },
+		{ "maintenance.prefetch.enabled", "true" },
+		{ "maintenance.prefetch.auto", "0" },
+		{ "maintenance.prefetch.schedule", "hourly" },
+		{ "maintenance.commit-graph.enabled", "true" },
+		{ "maintenance.commit-graph.auto", "0" },
+		{ "maintenance.commit-graph.schedule", "hourly" },
+		{ "maintenance.loose-objects.enabled", "true" },
+		{ "maintenance.loose-objects.auto", "0" },
+		{ "maintenance.loose-objects.schedule", "daily" },
+		{ "maintenance.incremental-repack.enabled", "true" },
+		{ "maintenance.incremental-repack.auto", "0" },
+		{ "maintenance.incremental-repack.schedule", "daily" },
 		{ NULL, NULL },
 	};
 	int i;
