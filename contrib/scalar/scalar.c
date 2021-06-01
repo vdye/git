@@ -124,6 +124,7 @@ static int set_recommended_config(int reconfigure)
 		{ "core.useBuiltinFSMonitor", "true" },
 #endif
 		{ "credential.validate", "false" }, /* GCM4W-only */
+		{ "credential.https://dev.azure.com.useHttpPath", "true" },
 		{ "feature.manyFiles", "false" },
 		{ "feature.experimental", "false" },
 		{ "fetch.unpackLimit", "1" },
@@ -144,6 +145,7 @@ static int set_recommended_config(int reconfigure)
 #ifndef WIN32
 		{ "core.untrackedCache", "true" },
 #else
+		{ "http.sslBackend", "schannel" },
 		/*
 		 * Unfortunately, Scalar's Functional Tests demonstrated
 		 * that the untracked cache feature is unreliable on Windows
@@ -161,10 +163,9 @@ static int set_recommended_config(int reconfigure)
 		{ NULL, NULL },
 	};
 	int i;
+	char *value;
 
 	for (i = 0; config[i].key; i++) {
-		char *value;
-
 		if ((reconfigure && config[i].overwrite_on_reconfigure) ||
 		    git_config_get_string(config[i].key, &value)) {
 			trace2_data_string("scalar", the_repository, config[i].key, "created");
@@ -176,6 +177,27 @@ static int set_recommended_config(int reconfigure)
 			trace2_data_string("scalar", the_repository, config[i].key, "exists");
 			free(value);
 		}
+	}
+
+	/*
+	 * The `log.excludeDecoration` setting is special because we want to
+	 * set multiple values.
+	 */
+	if (git_config_get_string("log.excludeDecoration", &value)) {
+		trace2_data_string("scalar", the_repository,
+				   "log.excludeDecoration", "created");
+		if (git_config_set_multivar_gently("log.excludeDecoration",
+						   "refs/scalar/*",
+						   CONFIG_REGEX_NONE, 0) ||
+		    git_config_set_multivar_gently("log.excludeDecoration",
+						   "refs/prefetch/*",
+						   CONFIG_REGEX_NONE, 0))
+			return error(_("could not configure "
+				       "log.excludeDecoration"));
+	} else {
+		trace2_data_string("scalar", the_repository,
+				   "log.excludeDecoration", "exists");
+		free(value);
 	}
 
 	return 0;
