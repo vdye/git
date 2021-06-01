@@ -109,40 +109,13 @@ static int set_recommended_config(int reconfigure)
 		const char *value;
 		int overwrite_on_reconfigure;
 	} config[] = {
-		{ "am.keepCR", "true" },
-		{ "commitGraph.generationVersion", "1", 1 },
-		{ "core.autoCRLF", "false" },
-		{ "core.FSCache", "true" },
-		{ "core.logAllRefUpdates", "true", 1 },
+		/* Required */
+		{ "am.keepCR", "true", 1 },
+		{ "core.FSCache", "true", 1 },
 		{ "core.multiPackIndex", "true", 1 },
 		{ "core.preloadIndex", "true", 1 },
-		{ "core.safeCRLF", "false" },
-#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
-		/*
-		 * Enable the built-in FSMonitor on supported platforms.
-		 */
-		{ "core.useBuiltinFSMonitor", "true" },
-#endif
-		{ "credential.validate", "false" },
-		{ "feature.manyFiles", "false" },
-		{ "feature.experimental", "false" },
-		{ "fetch.unpackLimit", "1" },
-		{ "fetch.writeCommitGraph", "false" },
-		{ "gc.auto", "0" },
-		{ "gui.GCWarning", "false" },
-		{ "index.threads", "true" },
-		{ "index.version", "4" },
-		{ "maintenance.auto", "false" },
-		{ "merge.stat", "false" },
-		{ "merge.renames", "false" },
-		{ "pack.useBitmaps", "false" },
-		{ "pack.useSparse", "true" },
-		{ "receive.autoGC", "false" },
-		{ "reset.quiet", "true" },
-		{ "status.aheadBehind", "false" },
-		{ "core.configWriteLockTimeoutMS", "150" },
 #ifndef WIN32
-		{ "core.untrackedCache", "true" },
+		{ "core.untrackedCache", "true", 1 },
 #else
 		/*
 		 * Unfortunately, Scalar's Functional Tests demonstrated
@@ -156,15 +129,60 @@ static int set_recommended_config(int reconfigure)
 		 * Therefore, with a sad heart, we disable this very useful
 		 * feature on Windows.
 		 */
-		{ "core.untrackedCache", "false" },
+		{ "core.untrackedCache", "false", 1 },
 #endif
+		{ "core.bare", "false", 1 },
+		{ "core.logAllRefUpdates", "true", 1 },
+		{ "credential.https://dev.azure.com.useHttpPath", "true", 1 },
+		{ "credential.validate", "false", 1 }, /* GCM4W-only */
+		{ "gc.auto", "0", 1 },
+		{ "gui.GCWarning", "false", 1 },
+		{ "index.threads", "true", 1 },
+		{ "index.version", "4", 1 },
+		{ "merge.stat", "false", 1 },
+		{ "merge.renames", "false", 1 },
+		{ "pack.useBitmaps", "false", 1 },
+		{ "pack.useSparse", "true", 1 },
+		{ "receive.autoGC", "false", 1 },
+		{ "reset.quiet", "true", 1 },
+		{ "feature.manyFiles", "false", 1 },
+		{ "feature.experimental", "false", 1 },
+		{ "fetch.unpackLimit", "1", 1 },
+		{ "fetch.writeCommitGraph", "false", 1 },
+#ifdef WIN32
+		{ "http.sslBackend", "schannel", 1 },
+#endif
+		/* Optional */
+		{ "status.aheadBehind", "false" },
+		{ "commitGraph.generationVersion", "1" },
+		{ "core.autoCRLF", "false" },
+		{ "core.safeCRLF", "false" },
+		{ "maintenance.gc.enabled", "false" },
+		{ "maintenance.prefetch.enabled", "true" },
+		{ "maintenance.prefetch.auto", "0" },
+		{ "maintenance.prefetch.schedule", "hourly" },
+		{ "maintenance.commit-graph.enabled", "true" },
+		{ "maintenance.commit-graph.auto", "0" },
+		{ "maintenance.commit-graph.schedule", "hourly" },
+		{ "maintenance.loose-objects.enabled", "true" },
+		{ "maintenance.loose-objects.auto", "0" },
+		{ "maintenance.loose-objects.schedule", "daily" },
+		{ "maintenance.incremental-repack.enabled", "true" },
+		{ "maintenance.incremental-repack.auto", "0" },
+		{ "maintenance.incremental-repack.schedule", "daily" },
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+		/*
+		 * Enable the built-in FSMonitor on supported platforms.
+		 */
+		{ "core.useBuiltinFSMonitor", "true" },
+#endif
+		{ "core.configWriteLockTimeoutMS", "150" },
 		{ NULL, NULL },
 	};
 	int i;
+	char *value;
 
 	for (i = 0; config[i].key; i++) {
-		char *value;
-
 		if ((reconfigure && config[i].overwrite_on_reconfigure) ||
 		    git_config_get_string(config[i].key, &value)) {
 			trace2_data_string("scalar", the_repository, config[i].key, "created");
@@ -176,6 +194,27 @@ static int set_recommended_config(int reconfigure)
 			trace2_data_string("scalar", the_repository, config[i].key, "exists");
 			free(value);
 		}
+	}
+
+	/*
+	 * The `log.excludeDecoration` setting is special because we want to
+	 * set multiple values.
+	 */
+	if (git_config_get_string("log.excludeDecoration", &value)) {
+		trace2_data_string("scalar", the_repository,
+				   "log.excludeDecoration", "created");
+		if (git_config_set_multivar_gently("log.excludeDecoration",
+						   "refs/scalar/*",
+						   CONFIG_REGEX_NONE, 0) ||
+		    git_config_set_multivar_gently("log.excludeDecoration",
+						   "refs/prefetch/*",
+						   CONFIG_REGEX_NONE, 0))
+			return error(_("could not configure "
+				       "log.excludeDecoration"));
+	} else {
+		trace2_data_string("scalar", the_repository,
+				   "log.excludeDecoration", "exists");
+		free(value);
 	}
 
 	return 0;
@@ -937,12 +976,18 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
+	if (set_config("credential.https://dev.azure.com.useHttpPath=true")) {
+		res = error(_("could not configure credential.useHttpPath"));
+		goto cleanup;
+	}
+
 	if (cache_server_url ||
 	    supports_gvfs_protocol(url, &default_cache_server_url)) {
 		if (!cache_server_url)
 			cache_server_url = default_cache_server_url;
 		if (set_config("core.useGVFSHelper=true") ||
-		    set_config("core.gvfs=150")) {
+		    set_config("core.gvfs=150") ||
+		    set_config("http.version=HTTP/1.1")) {
 			res = error(_("could not turn on GVFS helper"));
 			goto cleanup;
 		}
