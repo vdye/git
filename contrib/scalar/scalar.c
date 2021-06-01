@@ -959,12 +959,18 @@ static int cmd_clone(int argc, const char **argv)
 		goto cleanup;
 	}
 
+	if (set_config("credential.https://dev.azure.com.useHttpPath=true")) {
+		res = error(_("could not configure credential.useHttpPath"));
+		goto cleanup;
+	}
+
 	if (cache_server_url ||
 	    supports_gvfs_protocol(url, &default_cache_server_url)) {
 		if (!cache_server_url)
 			cache_server_url = default_cache_server_url;
 		if (set_config("core.useGVFSHelper=true") ||
-		    set_config("core.gvfs=150")) {
+		    set_config("core.gvfs=150") ||
+		    set_config("http.version=HTTP/1.1")) {
 			res = error(_("could not turn on GVFS helper"));
 			goto cleanup;
 		}
