@@ -123,7 +123,7 @@ static int set_recommended_config(int reconfigure)
 		 */
 		{ "core.useBuiltinFSMonitor", "true" },
 #endif
-		{ "credential.validate", "false" },
+		{ "credential.validate", "false" }, /* GCM4W-only */
 		{ "feature.manyFiles", "false" },
 		{ "feature.experimental", "false" },
 		{ "fetch.unpackLimit", "1" },
