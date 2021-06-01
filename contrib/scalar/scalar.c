@@ -170,6 +170,7 @@ static int set_recommended_config(int reconfigure)
 		{ "maintenance.incremental-repack.enabled", "true" },
 		{ "maintenance.incremental-repack.auto", "0" },
 		{ "maintenance.incremental-repack.schedule", "daily" },
+		{ "core.configWriteLockTimeoutMS", "150" },
 		{ NULL, NULL },
 	};
 	int i;
