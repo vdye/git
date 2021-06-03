@@ -454,7 +454,7 @@ static void unpack_trees_finish(struct merge_options *opt)
 
 static int save_files_dirs(const struct object_id *oid,
 			   struct strbuf *base, const char *path,
-			   unsigned int mode, int stage, void *context)
+			   unsigned int mode, void *context)
 {
 	struct path_hashmap_entry *entry;
 	int baselen = base->len;
@@ -474,8 +474,8 @@ static void get_files_dirs(struct merge_options *opt, struct tree *tree)
 {
 	struct pathspec match_all;
 	memset(&match_all, 0, sizeof(match_all));
-	read_tree_recursive(opt->repo, tree, "", 0, 0,
-			    &match_all, save_files_dirs, opt);
+	read_tree(opt->repo, tree,
+		  &match_all, save_files_dirs, opt);
 }
 
 static int get_tree_entry_if_blob(struct repository *r,
@@ -523,6 +523,8 @@ static struct string_list *get_unmerged(struct index_state *istate)
 
 	unmerged->strdup_strings = 1;
 
+	/* TODO: audit for interaction with sparse-index. */
+	ensure_full_index(istate);
 	for (i = 0; i < istate->cache_nr; i++) {
 		struct string_list_item *item;
 		struct stage_data *e;
@@ -2986,7 +2988,7 @@ static int blob_unchanged(struct merge_options *opt,
 	struct strbuf obuf = STRBUF_INIT;
 	struct strbuf abuf = STRBUF_INIT;
 	int ret = 0; /* assume changed for safety */
-	const struct index_state *idx = opt->repo->index;
+	struct index_state *idx = opt->repo->index;
 
 	if (a->mode != o->mode)
 		return 0;
