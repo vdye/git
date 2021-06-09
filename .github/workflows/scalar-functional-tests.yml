@@ -10,7 +10,7 @@ on:
   push:
     branches: [ vfs-* ]
   pull_request:
-    branches: [ vfs-* ]
+    branches: [ vfs-*, features/* ]
 
 jobs:
   scalar:
