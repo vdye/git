@@ -21,7 +21,10 @@ jobs:
       matrix:
         # Order by runtime (in descending order)
         os: [windows-2019, macos-10.15, ubuntu-16.04, ubuntu-18.04, ubuntu-20.04]
-        features: [false, experimental]
+        # Scalar.NET used to be tested using `features: [false, experimental]`
+        # But currently, Scalar/C ignores `feature.scalar` altogether, so let's
+        # save some electrons and run only one of them...
+        features: [ignored]
         exclude:
           # The built-in FSMonitor is not (yet) supported on Linux
           - os: ubuntu-16.04
