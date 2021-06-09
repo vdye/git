@@ -1,9 +1,10 @@
 name: Scalar Functional Tests
 
 env:
-  SCALAR_REPOSITORY: dscho/scalar
-  SCALAR_REF: vfs-2.32.0
+  SCALAR_REPOSITORY: derrickstolee/scalar
+  SCALAR_REF: test-scalar-in-c
   DEBUG_WITH_TMATE: false
+  SCALAR_TEST_SKIP_VSTS_INFO: true
 
 on:
   push:
@@ -20,7 +21,10 @@ jobs:
       matrix:
         # Order by runtime (in descending order)
         os: [windows-2019, macos-10.15, ubuntu-16.04, ubuntu-18.04, ubuntu-20.04]
-        features: [false, experimental]
+        # Scalar.NET used to be tested using `features: [false, experimental]`
+        # But currently, Scalar/C ignores `feature.scalar` altogether, so let's
+        # save some electrons and run only one of them...
+        features: [ignored]
         exclude:
           # The built-in FSMonitor is not (yet) supported on Linux
           - os: ubuntu-16.04
@@ -102,15 +106,17 @@ jobs:
             ;;
           esac
 
-          $SUDO make -j5 $extra install
+          $SUDO make -j5 INCLUDE_SCALAR=AbsolutelyYes $extra install
 
-      - name: Ensure that we use the built Git (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
+      - name: Ensure that we use the built Git and Scalar
+        shell: bash
         run: |
-          cmd /c where git
+          type -p git
           git version
-          if ((git version) -like "*.vfs.*") { echo Good } else { exit 1 }
+          case "$(git version)" in *.vfs.*) echo Good;; *) exit 1;; esac
+          type -p scalar
+          scalar version
+          case "$(scalar version 2>&1)" in *.vfs.*) echo Good;; *) exit 1;; esac
 
       - name: Check out Scalar's source code
         uses: actions/checkout@v2
@@ -172,11 +178,10 @@ jobs:
           mkdir -p "$TRACE2_BASENAME/Perf"
           git version --build-options
           cd ../out
-          PATH="$PWD/Scalar/$BUILD_FRAGMENT:$PWD/Scalar.Service/$BUILD_FRAGMENT:$PATH"
           Scalar.FunctionalTests/$BUILD_FRAGMENT/Scalar.FunctionalTests$BUILD_FILE_EXT --test-scalar-on-path --test-git-on-path --timeout=300000 --full-suite
 
       - name: Force-stop FSMonitor daemons and Git processes (Windows)
-        if: runner.os == 'Windows' && matrix.features == 'experimental' && (success() || failure())
+        if: runner.os == 'Windows' && (success() || failure())
         shell: bash
         run: |
           set -x
