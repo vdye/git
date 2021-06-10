@@ -2110,7 +2110,7 @@ int format_tracking_info(struct branch *branch, struct strbuf *sb,
 	sti = stat_tracking_info(branch, &ours, &theirs, &full_base, 0, abf);
 	trace2_data_intmax("tracking", NULL, "stat_tracking_info/ab_flags", abf);
 	trace2_data_intmax("tracking", NULL, "stat_tracking_info/ab_result", sti);
-	if (abf == AHEAD_BEHIND_FULL) {
+	if (sti >= 0 && abf == AHEAD_BEHIND_FULL) {
 	    trace2_data_intmax("tracking", NULL, "stat_tracking_info/ab_ahead", ours);
 	    trace2_data_intmax("tracking", NULL, "stat_tracking_info/ab_behind", theirs);
 	}
