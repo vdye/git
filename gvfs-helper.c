@@ -1840,13 +1840,19 @@ static void my_run_index_pack(struct gh__request_params *params,
 
 	strvec_push(&ip.args, "git");
 	strvec_push(&ip.args, "index-pack");
-	if (gh__cmd_opts.show_progress)
+
+	if (gh__cmd_opts.show_progress) {
 		strvec_push(&ip.args, "-v");
+		ip.err = 0;
+	} else {
+		ip.err = -1;
+		ip.no_stderr = 1;
+	}
+
 	strvec_pushl(&ip.args, "-o", temp_path_idx->buf, NULL);
 	strvec_push(&ip.args, temp_path_pack->buf);
 	ip.no_stdin = 1;
 	ip.out = -1;
-	ip.err = -1;
 
 	if (pipe_command(&ip, NULL, 0, &ip_stdout, 0, NULL, 0)) {
 		unlink(temp_path_pack->buf);
