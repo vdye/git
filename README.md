@@ -7,6 +7,13 @@ This is `microsoft/git`, a special Git distribution to support monorepo scenario
 working in a monorepo, you are likely searching for
 [Git for Windows](http://git-for-windows.github.io/) instead of this codebase.
 
+In addition to the Git command-line interface (CLI), `microsoft/git` includes the Scalar CLI to
+further enable working with extremely large repositories. Scalar is a tool to apply the latest
+recommendations and use the most advanced Git features. You can read
+[the Scalar CLI documentation](contrib/scalar/scalar.txt) or read our
+[Scalar user guide](contrib/scalar/docs/index.md) including
+[the philosophy of Scalar](contrib/scalar/docs/philosophy.md).
+
 If you encounter problems with `microsoft/git`, please report them as
 [GitHub issues](https://github.com/microsoft/git/issues).
 
