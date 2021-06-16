@@ -1,5 +1,5 @@
-`microsoft/git`
-===============
+`microsoft/git` and the Scalar CLI
+==================================
 
 [![CI/PR](https://github.com/microsoft/git/actions/workflows/main.yml/badge.svg)](https://github.com/microsoft/git/actions/workflows/main.yml)
 
@@ -134,8 +134,8 @@ For other distributions, you will need to compile and install `microsoft/git` fr
 ```shell
 git clone https://github.com/microsoft/git microsoft-git
 cd microsoft-git
-make -j12 prefix=/usr/local
-sudo make -j12 prefix=/usr/local install
+make -j12 prefix=/usr/local IncludeScalar=YesPlease
+sudo make -j12 prefix=/usr/local IncludeScalar=YesPlease install
 ```
 
 For more assistance building Git from source, see
