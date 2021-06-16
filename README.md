@@ -30,12 +30,16 @@ manage all that data. As Git commands like `status` and `fetch` get slower, deve
 and start switching context. And context switches harm developer productivity.
 
 `microsoft/git` is focused on addressing these performance woes and making the monorepo developer
-experience first-class. It does so in part by working with the
-[GVFS protocol](https://docs.microsoft.com/en-us/azure/devops/learn/git/gvfs-architecture#gvfs-protocol)
-to prefetch packs of commits and trees and delay downloading of associated blobs. This is required
-for monorepos using [VFS for Git](https://github.com/microsoft/VFSForGit/blob/master/Readme.md).
-Additionally, some Git hosting providers support the GVFS protocol instead of the Git-native
-[partial clone feature](https://github.blog/2020-12-21-get-up-to-speed-with-partial-clone-and-shallow-clone/).
+experience first-class. The Scalar CLI packages all of these recommendations into a simple set of
+commands.
+
+One major feature that Scalar recommends is [partial clone](https://github.blog/2020-12-21-get-up-to-speed-with-partial-clone-and-shallow-clone/),
+which reduces the amount of data transferred in order to work with a Git repository. While several
+services such as GitHub support partial clone, Azure Repos instead has an older version of this
+functionality called
+[the GVFS protocol](https://docs.microsoft.com/en-us/azure/devops/learn/git/gvfs-architecture#gvfs-protocol).
+The integration with the GVFS protocol present in `microsoft/git` is not appropriate to include in
+the core Git client because partial clone is the official version of that functionality.
 
 Downloading and Installing
 =========================================================
