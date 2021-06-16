@@ -117,7 +117,7 @@ recent [`.deb` package](https://github.com/microsoft/git/releases). For example,
 specific version as follows:
 
 ```shell
-wget -o microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.32.0.vfs.0.2/git-vfs_2.32.0.vfs.0.1.deb
+wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.32.0.vfs.0.2/git-vfs_2.32.0.vfs.0.2.deb
 sudo dpkg -i microsoft-git.deb
 ```
 
