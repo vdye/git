@@ -65,6 +65,14 @@ To install with Winget, run
 winget install microsoft/git
 ```
 
+Double-check that you have the right version by running these commands,
+which should have the same output:
+
+```shell
+git version
+scalar version
+```
+
 To upgrade `microsoft/git`, use the following Git command, which will download and install the latest
 release.
 
@@ -85,6 +93,14 @@ brew tap microsoft/git
 brew install --cask microsoft-git
 ```
 
+Double-check that you have the right version by running these commands,
+which should have the same output:
+
+```shell
+git version
+scalar version
+```
+
 To upgrade microsoft/git, you can run the necessary `brew` commands:
 
 ```shell
@@ -103,6 +119,14 @@ specific version as follows:
 ```shell
 wget -o microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.32.0.vfs.0.2/git-vfs_2.32.0.vfs.0.1.deb
 sudo dpkg -i microsoft-git.deb
+```
+
+Double-check that you have the right version by running these commands,
+which should have the same output:
+
+```shell
+git version
+scalar version
 ```
 
 For other distributions, you will need to compile and install `microsoft/git` from source:
