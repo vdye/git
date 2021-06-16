@@ -44,7 +44,7 @@ next to your source code. These are commonly "hidden" from Git using
 additional work for Git because it needs to look at these files and match them
 against the `.gitignore` patterns.
 
-By following the pattern Scalar tries to establish and placing your build
+By following the `src` pattern Scalar tries to establish and placing your build
 intermediates and outputs parallel with the `src` folder and not inside it,
 you can help optimize Git command performance for developers in the repository
 by limiting the number of files Git needs to consider for many common

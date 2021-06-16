@@ -18,7 +18,8 @@ Creating a new Scalar clone using the GVFS Protocol
 ---------------------------------------------------
 
 The `clone` verb creates a local enlistment of a remote repository using the
-[GVFS protocol](https://github.com/microsoft/VFSForGit/blob/HEAD/Protocol.md).
+[GVFS protocol](https://github.com/microsoft/VFSForGit/blob/HEAD/Protocol.md),
+such as Azure Repos.
 
 ```
 scalar clone [options] <url> [<dir>]
@@ -48,7 +49,7 @@ to your working set.
   tree. No folders are populated.
 * Set the directory list for your sparse-checkout using:
 	1. `git sparse-checkout set <dir1> <dir2> ...`
-	2. `git sparse-checkout set --stdin <dir-list.txt`
+	2. `git sparse-checkout set --stdin < dir-list.txt`
 * Run git commands as you normally would.
 * To fully populate your working directory, run `git sparse-checkout disable`.
 

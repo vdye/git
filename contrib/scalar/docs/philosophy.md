@@ -43,9 +43,8 @@ benefits:
   remotes.
 * Advanced data structures, such as the `commit-graph` and `multi-pack-index`
   are updated automatically in the background.
-* If Watchman is installed, then the FileSystem Monitor hook is configured
-  to use Watchman's change-tracking, providing faster commands such as
-  `git status` or `git add`.
+* If using macOS or Windows, then Scalar configures Git's builtin File System
+  Monitor, providing faster commands such as `git status` or `git add`.
 
 Additionally, if you use `scalar clone` to create a new repository, then
 you will automatically get these benefits:
