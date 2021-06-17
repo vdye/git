@@ -134,8 +134,8 @@ For other distributions, you will need to compile and install `microsoft/git` fr
 ```shell
 git clone https://github.com/microsoft/git microsoft-git
 cd microsoft-git
-make -j12 prefix=/usr/local IncludeScalar=YesPlease
-sudo make -j12 prefix=/usr/local IncludeScalar=YesPlease install
+make -j12 prefix=/usr/local INCLUDE_SCALAR=YesPlease
+sudo make -j12 prefix=/usr/local INCLUDE_SCALAR=YesPlease install
 ```
 
 For more assistance building Git from source, see
