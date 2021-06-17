@@ -35,6 +35,9 @@ test_expect_success 'setup' '
 		mkdir deep/deeper1/0/0 &&
 		touch deep/deeper1/0/1 &&
 		touch deep/deeper1/0/0/0 &&
+		>folder1- &&
+		>folder1. &&
+		>folder10 &&
 		cp -r deep/deeper1/0 folder1 &&
 		cp -r deep/deeper1/0 folder2 &&
 		echo >>folder1/0/0/0 &&
