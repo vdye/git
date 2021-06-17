@@ -664,13 +664,14 @@ static int add_file_to_list(const struct object_id *oid,
 	struct string_list_item *it;
 	struct wt_status_change_data *d;
 	struct wt_status *s = context;
-	char *full_name;
+	struct strbuf full_name = STRBUF_INIT;
 
 	if (S_ISDIR(mode))
 		return READ_TREE_RECURSIVE;
 
-	full_name = xstrfmt("%s%s", base->buf, path);
-	it = string_list_insert(&s->change, full_name);
+	strbuf_add(&full_name, base->buf, base->len);
+	strbuf_addstr(&full_name, path);
+	it = string_list_insert(&s->change, full_name.buf);
 	d = it->util;
 	if (!d) {
 		CALLOC_ARRAY(d, 1);
@@ -682,6 +683,7 @@ static int add_file_to_list(const struct object_id *oid,
 	d->mode_index = mode;
 	oidcpy(&d->oid_index, oid);
 	s->committable = 1;
+	strbuf_release(&full_name);
 	return 0;
 }
 
