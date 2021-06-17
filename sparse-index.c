@@ -261,7 +261,7 @@ void ensure_full_index(struct index_state *istate)
 			warning(_("index entry is a directory, but not sparse (%08x)"),
 				ce->ce_flags);
 
-		/* recursively walk into cd->name */
+		/* recursively walk into ce->name */
 		tree = lookup_tree(istate->repo, &ce->oid);
 
 		memset(&ps, 0, sizeof(ps));
