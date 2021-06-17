@@ -44,7 +44,7 @@ the core Git client because partial clone is the official version of that functi
 Downloading and Installing
 =========================================================
 
-If you're working in a monorepo and want to take advantage of the performance boots in
+If you're working in a monorepo and want to take advantage of the performance boosts in
 `microsoft/git`, then you can download the latest version installer for your OS from the
 [Releases page](https://github.com/microsoft/git/releases). Alternatively, you can opt to install
 via the command line, using the below instructions for supported OSes:
