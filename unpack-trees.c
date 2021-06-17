@@ -1118,11 +1118,11 @@ static int unpack_single_entry(int n, unsigned long mask,
 		return 0;
 
 	/* defer work if our cache entry doesn't match the expectations. */
-	if (sparse_directory) {
-		if (src[0] && !S_ISSPARSEDIR(src[0]->ce_mode))
+	if (src[0]) {
+		if (sparse_directory && !S_ISSPARSEDIR(src[0]->ce_mode))
 			BUG("expected sparse directory entry");
-	} else if (src[0] && S_ISSPARSEDIR(src[0]->ce_mode)) {
-		return 0;
+		else if (!sparse_directory && S_ISSPARSEDIR(src[0]->ce_mode))
+			return 0;
 	}
 
 	/*
