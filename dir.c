@@ -1460,16 +1460,18 @@ enum pattern_match_result path_matches_pattern_list(
 	 * use the file-base matching logic in an equivalent way.
 	 */
 	if (parent_pathname.len > 0 &&
-	    parent_pathname.buf[parent_pathname.len - 1] == '/')
+	    parent_pathname.buf[parent_pathname.len - 1] == '/') {
+		slash_pos = parent_pathname.buf + parent_pathname.len - 1;
 		strbuf_add(&parent_pathname, "-", 1);
+	} else {
+		slash_pos = strrchr(parent_pathname.buf, '/');
+	}
 
 	if (hashmap_contains_path(&pl->recursive_hashmap,
 				  &parent_pathname)) {
 		result = MATCHED_RECURSIVE;
 		goto done;
 	}
-
-	slash_pos = strrchr(parent_pathname.buf, '/');
 
 	if (slash_pos == parent_pathname.buf) {
 		/* include every file in root */
