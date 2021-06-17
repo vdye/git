@@ -1,8 +1,8 @@
 name: Scalar Functional Tests
 
 env:
-  SCALAR_REPOSITORY: derrickstolee/scalar
-  SCALAR_REF: test-scalar-in-c
+  SCALAR_REPOSITORY: microsoft/scalar
+  SCALAR_REF: main
   DEBUG_WITH_TMATE: false
   SCALAR_TEST_SKIP_VSTS_INFO: true
 
