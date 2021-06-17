@@ -7,6 +7,9 @@ It achieves this by enabling some advanced Git features, such as:
 * *Partial clone:* reduces time to get a working repository by not
   downloading all Git objects right away.
 
+* *Background prefetch:* downloads Git object data from all remotes every
+  hour, reducing the amount of time for foreground `git fetch` calls.
+
 * *Sparse-checkout:* limits the size of your working directory.
 
 * *File system monitor:* tracks the recently modified files and eliminates
@@ -22,7 +25,8 @@ It achieves this by enabling some advanced Git features, such as:
 
 By running `scalar register` in any Git repo, Scalar will automatically enable
 these features for that repo (except partial clone) and start running suggested
-maintenance in the background.
+maintenance in the background using
+[the `git maintenance` feature](https://git-scm.com/docs/git-maintenance).
 
 Repos cloned with the `scalar clone` command use partial clone or the
 [GVFS protocol](https://github.com/microsoft/VFSForGit/blob/HEAD/Protocol.md)

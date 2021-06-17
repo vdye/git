@@ -38,7 +38,7 @@ can explore the subdirectories outside your sparse-checkout specification using
 
 ### Sparse Repo Mode
 
-By default, Scalar reduces your working directory to the only the files at the
+By default, Scalar reduces your working directory to only the files at the
 root of the repository. You need to add the folders you care about to build up
 to your working set.
 

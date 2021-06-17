@@ -40,7 +40,7 @@ these folders during its builds.
 
 Your build system may create build artifacts such as `.obj` or `.lib` files
 next to your source code. These are commonly "hidden" from Git using
-`.gitignore` files. Having such artifacts into your source tree creates
+`.gitignore` files. Having such artifacts in your source tree creates
 additional work for Git because it needs to look at these files and match them
 against the `.gitignore` patterns.
 
