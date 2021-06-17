@@ -395,6 +395,7 @@ check_sparse_index_behavior () {
 	GIT_TRACE2_EVENT="$(pwd)/trace2.txt" GIT_TRACE2_EVENT_NESTING=10 \
 		git status --porcelain=v2 >actual &&
 	test_region $1 index ensure_full_index trace2.txt &&
+	test_region fsm_hook query trace2.txt &&
 	test_cmp expect actual &&
 	rm trace2.txt &&
 	git sparse-checkout disable
