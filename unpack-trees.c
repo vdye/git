@@ -1085,8 +1085,8 @@ static struct cache_entry *create_ce_entry(const struct traverse_info *info,
 	ce->ce_flags = create_ce_flags(stage);
 	ce->ce_namelen = len;
 	oidcpy(&ce->oid, &n->oid);
-	/* alloc_len+1 because the cache_entry allocates space for NUL */
-	make_traverse_path(ce->name, alloc_len + 1, info, n->path, n->pathlen);
+	/* len+1 because the cache_entry allocates space for NUL */
+	make_traverse_path(ce->name, len + 1, info, n->path, n->pathlen);
 
 	if (is_sparse_directory) {
 		ce->name[len] = '/';
@@ -1304,13 +1304,26 @@ static struct cache_entry *find_cache_entry(struct traverse_info *info,
 	if (pos < 0 || pos >= o->src_index->cache_nr)
 		return NULL;
 
-	ce = o->src_index->cache[pos];
+	/*
+	 * We might have multiple entries between 'pos' and
+	 * the actual sparse-directory entry, so start walking
+	 * back until finding it or passing where it would be.
+	 */
+	while (pos >= 0) {
+		ce = o->src_index->cache[pos];
 
-	if (!S_ISSPARSEDIR(ce->ce_mode))
-		return NULL;
+		/*
+		 * Have we walked too far?
+		 */
+		if (strncmp(ce->name, p->path, p->pathlen))
+			return NULL;
 
-	if (sparse_dir_matches_path(ce, info, p))
-		return ce;
+		if (S_ISSPARSEDIR(ce->ce_mode) &&
+		    sparse_dir_matches_path(ce, info, p))
+			return ce;
+
+		pos--;
+	}
 
 	return NULL;
 }
