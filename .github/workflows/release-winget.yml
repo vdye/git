@@ -35,4 +35,4 @@ jobs:
           PackageLocale: en-US
           ManifestType: singleton
           ManifestVersion: 1.0.0
-      alwaysUsePullRequest: true
+        alwaysUsePullRequest: true
