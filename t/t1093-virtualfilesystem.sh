@@ -368,4 +368,14 @@ test_expect_success 'folder with same prefix as file' '
 	test_cmp expected actual
 '
 
+test_expect_success 'virtualfilsystem hook disables built-in FSMonitor ' '
+	clean_repo &&
+	test_config core.usebuiltinfsmonitor true &&
+	write_script .git/hooks/virtualfilesystem <<-\EOF &&
+		printf "dir1/\0"
+	EOF
+	git status &&
+	test_must_fail git fsmonitor--daemon status
+'
+
 test_done
