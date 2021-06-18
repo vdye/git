@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "config.h"
 #include "fsmonitor.h"
 #include "simple-ipc.h"
 #include "fsmonitor-ipc.h"
@@ -10,6 +11,8 @@
 
 int fsmonitor_ipc__is_supported(void)
 {
+	if (git_config_get_virtualfilesystem())
+		return 0;
 	return 1;
 }
 
