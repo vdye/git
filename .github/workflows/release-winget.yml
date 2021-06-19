@@ -9,20 +9,20 @@ jobs:
     steps:
     - id: update-winget
       name: Update winget repository
-      uses: mjcheetham/update-winget@v1.2.2
+      uses: mjcheetham/update-winget@v1.3.2
       with:
         id: Microsoft.Git
         token: ${{ secrets.WINGET_TOKEN }}
         releaseAsset: Git-([0-9.vfs]*)\-64-bit.exe
         manifestText: |
           PackageIdentifier: {{id}}
-          PackageVersion: {{version}}
+          PackageVersion: {{version:s/\.[A-Za-z]+\././}}
           PackageName: Microsoft Git
-          Publisher: Microsoft Corporation
+          Publisher: The Git Client Team at GitHub
           Moniker: microsoft-git
           PackageUrl: https://aka.ms/ms-git
           Tags: [ microsoft-git ]
-          License: Copyright (C) Microsoft Corporation
+          License: GPLv2
           ShortDescription: |
             Git distribution to support monorepo scenarios.
             Note: This is not Git for Windows. Unless you are working in a monorepo and require
@@ -32,8 +32,6 @@ jobs:
             InstallerUrl: {{url}}
             InstallerType: inno
             InstallerSha256: {{sha256}}
-            InstallerSwitches:
-              Custom: /COMPONENTS="AUTOUPDATE"
           PackageLocale: en-US
           ManifestType: singleton
           ManifestVersion: 1.0.0
