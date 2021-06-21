@@ -709,10 +709,9 @@ static void wt_status_collect_changes_initial(struct wt_status *s)
 			 * tree and marking them with DIFF_STATUS_ADDED.
 			 */
 			struct strbuf base = STRBUF_INIT;
-			struct pathspec ps;
+			struct pathspec ps = { 0 };
 			struct tree *tree = lookup_tree(istate->repo, &ce->oid);
 
-			memset(&ps, 0, sizeof(ps));
 			ps.recursive = 1;
 			ps.has_wildcard = 1;
 			ps.max_depth = -1;
