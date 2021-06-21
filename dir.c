@@ -1420,7 +1420,7 @@ enum pattern_match_result path_matches_pattern_list(
 	struct path_pattern *pattern;
 	struct strbuf parent_pathname = STRBUF_INIT;
 	int result = NOT_MATCHED;
-	const char *slash_pos;
+	size_t slash_pos;
 
 	/*
 	 * The virtual file system data is used to prevent git from traversing
@@ -1461,10 +1461,10 @@ enum pattern_match_result path_matches_pattern_list(
 	 */
 	if (parent_pathname.len > 0 &&
 	    parent_pathname.buf[parent_pathname.len - 1] == '/') {
-		slash_pos = parent_pathname.buf + parent_pathname.len - 1;
+		slash_pos = parent_pathname.len - 1;
 		strbuf_add(&parent_pathname, "-", 1);
 	} else {
-		slash_pos = strrchr(parent_pathname.buf, '/');
+		slash_pos = strrchr(parent_pathname.buf, '/') - parent_pathname.buf;
 	}
 
 	if (hashmap_contains_path(&pl->recursive_hashmap,
@@ -1473,13 +1473,13 @@ enum pattern_match_result path_matches_pattern_list(
 		goto done;
 	}
 
-	if (slash_pos == parent_pathname.buf) {
+	if (!slash_pos) {
 		/* include every file in root */
 		result = MATCHED;
 		goto done;
 	}
 
-	strbuf_setlen(&parent_pathname, slash_pos - parent_pathname.buf);
+	strbuf_setlen(&parent_pathname, slash_pos);
 
 	if (hashmap_contains_path(&pl->parent_hashmap, &parent_pathname)) {
 		result = MATCHED;
