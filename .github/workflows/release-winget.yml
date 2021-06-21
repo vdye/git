@@ -21,7 +21,8 @@ jobs:
           Publisher: The Git Client Team at GitHub
           Moniker: microsoft-git
           PackageUrl: https://aka.ms/ms-git
-          Tags: [ microsoft-git ]
+          Tags: 
+          - microsoft-git
           License: GPLv2
           ShortDescription: |
             Git distribution to support monorepo scenarios.
