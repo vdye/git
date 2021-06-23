@@ -40,7 +40,7 @@ jobs:
           const release = 'latest'
           const release_arg = release === 'latest' ? 'latest' : 'tags/release'
           console.log(`release_arg is: ${release_arg}`)
-          await github.repos.getReleaseAsset({
+          await github.repos.getReleaseByTag({
             owner: context.repo.owner,
             repo: context.repo.repo,
             tag_name: release_arg
