@@ -183,6 +183,7 @@ int convert_to_sparse(struct index_state *istate)
 	 * Silently return if there is a problem with the cache tree update,
 	 * which might just be due to a conflict state in some entry.
 	 */
+	trace2_printf("%s", __func__);
 	if (cache_tree_update(istate, 0))
 		return 0;
 
@@ -194,6 +195,7 @@ int convert_to_sparse(struct index_state *istate)
 						 "", 0, istate->cache_tree);
 
 	/* Clear and recompute the cache-tree */
+	trace2_printf("%s", __func__);
 	cache_tree_free(&istate->cache_tree);
 	cache_tree_update(istate, 0);
 
@@ -305,6 +307,7 @@ void ensure_full_index(struct index_state *istate)
 	free(full);
 
 	/* Clear and recompute the cache-tree */
+	trace2_printf("%s", __func__);
 	cache_tree_free(&istate->cache_tree);
 	cache_tree_update(istate, 0);
 

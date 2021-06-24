@@ -393,6 +393,10 @@ static int update_one(struct cache_tree *it,
 		ce_missing_ok = mode == S_IFGITLINK || missing_ok ||
 			(has_promisor_remote() &&
 			 ce_skip_worktree(ce));
+
+trace2_printf("%s expected_missing(%d)...ce_missing_ok(%d) = (mode(%d) == S_IFGITLINK(%d)) || missing_ok(%d) || (has_promisor_remote()(%d) && (ce_skip_worktree(ce(%s))(%d))",
+		__func__, expected_missing, ce_missing_ok, mode, S_IFGITLINK, missing_ok,
+		has_promisor_remote(), ce->name, ce_skip_worktree(ce));
 		if (is_null_oid(oid) ||
 		    (!ce_missing_ok && !has_object_file(oid))) {
 			strbuf_release(&buffer);
@@ -501,6 +505,7 @@ int cache_tree_update(struct index_state *istate, int flags)
 
 	trace_performance_enter();
 	trace2_region_enter("cache_tree", "update", the_repository);
+	trace2_printf("%s HELLO! DOING CACHE TREE THINGS!");
 	i = update_one(istate->cache_tree, istate->cache, istate->cache_nr,
 		       "", 0, &skip, flags);
 	trace2_region_leave("cache_tree", "update", the_repository);
