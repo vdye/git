@@ -1464,7 +1464,8 @@ enum pattern_match_result path_matches_pattern_list(
 		slash_pos = parent_pathname.len - 1;
 		strbuf_add(&parent_pathname, "-", 1);
 	} else {
-		slash_pos = strrchr(parent_pathname.buf, '/') - parent_pathname.buf;
+		const char *slash_ptr = strrchr(parent_pathname.buf, '/');
+		slash_pos = slash_ptr ? slash_ptr - parent_pathname.buf : 0;
 	}
 
 	if (hashmap_contains_path(&pl->recursive_hashmap,
