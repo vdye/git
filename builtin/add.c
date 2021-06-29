@@ -208,7 +208,11 @@ static int refresh(int verbose, const struct pathspec *pathspec)
 		}
 	}
 
-	if (only_match_skip_worktree.nr) {
+	/*
+	 * When using a virtual filesystem, we might re-add a path
+	 * that is currently virtual and we want that to succeed.
+	 */
+	if (!core_virtualfilesystem && only_match_skip_worktree.nr) {
 		advise_on_updating_sparse_paths(&only_match_skip_worktree);
 		ret = 1;
 	}
@@ -628,7 +632,12 @@ int cmd_add(int argc, const char **argv, const char *prefix)
 			if (seen[i])
 				continue;
 
-			if (matches_skip_worktree(&pathspec, i, &skip_worktree_seen)) {
+			/*
+			 * When using a virtual filesystem, we might re-add a path
+			 * that is currently virtual and we want that to succeed.
+			 */
+			if (!core_virtualfilesystem &&
+			    matches_skip_worktree(&pathspec, i, &skip_worktree_seen)) {
 				string_list_append(&only_match_skip_worktree,
 						   pathspec.items[i].original);
 				continue;
@@ -650,7 +659,6 @@ int cmd_add(int argc, const char **argv, const char *prefix)
 					    pathspec.items[i].original);
 			}
 		}
-
 
 		if (only_match_skip_worktree.nr) {
 			advise_on_updating_sparse_paths(&only_match_skip_worktree);
