@@ -116,7 +116,7 @@ Or you can run the `git update-microsoft-git` command, which will run those brew
 Hippo (21.04). Take the following steps to set up and install based on the
 version you are running:
 
-### Bionic
+### Ubuntu 18.04 (Bionic)
 
 ```shell
 curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
