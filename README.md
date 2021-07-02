@@ -112,9 +112,33 @@ Or you can run the `git update-microsoft-git` command, which will run those brew
 
 ## Linux
 
-For Ubuntu/Debian distributions, `apt-get` support is coming soon. For now, please use the most
-recent [`.deb` package](https://github.com/microsoft/git/releases). For example, you can download a
-specific version as follows:
+`apt-get` support is available for Ubuntu Bionic Beaver (18.04) and Hirsute
+Hippo (21.04). Take the following steps to set up and install based on the
+version you are running:
+
+### Ubuntu 18.04 (Bionic)
+
+```shell
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+sudo apt-add-repository https://packages.microsoft.com/ubuntu/18.04/prod
+sudo apt-get update
+sudo apt-get install microsoft-git
+```
+
+### Ubuntu 21.04 (Hirsute)
+
+```shell
+curl -sSL https://packages.microsoft.com/config/ubuntu/21.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+sudo apt-get update
+sudo apt-get install microsoft-git
+```
+
+### Other Ubuntu/Debian distributions
+
+Please use the most recent
+[`.deb` package](https://github.com/microsoft/git/releases). For example,
+you can download a specific version as follows:
 
 ```shell
 wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.32.0.vfs.0.2/git-vfs_2.32.0.vfs.0.2.deb
@@ -128,8 +152,8 @@ which should have the same output:
 git version
 scalar version
 ```
-
-For other distributions, you will need to compile and install `microsoft/git` from source:
+### Non-Ubuntu/Debian distributions
+You will need to compile and install `microsoft/git` from source:
 
 ```shell
 git clone https://github.com/microsoft/git microsoft-git
