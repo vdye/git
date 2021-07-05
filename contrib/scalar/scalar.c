@@ -1007,6 +1007,9 @@ static int cmd_clone(int argc, const char **argv)
 			res = error(_("could not configure cache server"));
 			goto cleanup;
 		}
+		if (cache_server_url)
+			fprintf(stderr, "Cache server URL: %s\n",
+				cache_server_url);
 	} else {
 		if (set_config("core.useGVFSHelper=false") ||
 		    set_config("remote.origin.promisor=true") ||
