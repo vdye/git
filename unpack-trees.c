@@ -1255,7 +1255,8 @@ static int sparse_dir_matches_path(const struct cache_entry *ce,
 static struct cache_entry *find_cache_entry(struct traverse_info *info,
 					    const struct name_entry *p)
 {
-	struct cache_entry *ce;
+	const char *path;
+	struct cache_entry *ce = NULL;
 	int pos = find_cache_pos(info, p->path, p->pathlen);
 	struct unpack_trees_options *o = info->data;
 
@@ -1283,7 +1284,9 @@ static struct cache_entry *find_cache_entry(struct traverse_info *info,
 	while (pos >= 0) {
 		ce = o->src_index->cache[pos];
 
-		if (strncmp(ce->name, p->path, p->pathlen))
+		if (!skip_prefix(ce->name, info->traverse_path, &path) ||
+		    strncmp(path, p->path, p->pathlen) ||
+		    path[p->pathlen] != '/')
 			return NULL;
 
 		if (S_ISSPARSEDIR(ce->ce_mode) &&
