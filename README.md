@@ -112,7 +112,7 @@ Or you can run the `git update-microsoft-git` command, which will run those brew
 
 ## Linux
 
-`apt-get` support is available for Ubuntu Bionic Beaver (18.04) and Hirsute 
+`apt-get` support is available for Ubuntu Bionic Beaver (18.04) and Hirsute
 Hippo (21.04). Take the following steps to set up and install based on the
 version you are running:
 
@@ -136,8 +136,8 @@ sudo apt-get install microsoft-git
 
 ### Other Ubuntu/Debian distributions
 
-Please use the most recent 
-[`.deb` package](https://github.com/microsoft/git/releases). For example, 
+Please use the most recent
+[`.deb` package](https://github.com/microsoft/git/releases). For example,
 you can download a specific version as follows:
 
 ```shell
