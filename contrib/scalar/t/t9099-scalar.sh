@@ -204,4 +204,46 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 	)
 '
 
+test_expect_success '`scalar register` & `unregister` with existing repo' '
+	git init existing &&
+	scalar register existing &&
+	git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/existing" &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/existing" scalar.repos &&
+	scalar unregister existing &&
+	test_must_fail git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/existing" &&
+	scalar list >scalar.repos &&
+	! grep -F "$(pwd)/existing" scalar.repos
+'
+
+test_expect_success '`scalar unregister` with existing repo, deleted .git' '
+	scalar register existing &&
+	rm -rf existing/.git &&
+	scalar unregister existing &&
+	test_must_fail git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/existing" &&
+	scalar list >scalar.repos &&
+	! grep -F "$(pwd)/existing" scalar.repos
+'
+
+test_expect_success '`scalar register` existing repo with `src` folder' '
+	git init existing &&
+	mkdir -p existing/src &&
+	scalar register existing/src &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/existing" scalar.repos &&
+	scalar unregister existing &&
+	scalar list >scalar.repos &&
+	! grep -F "$(pwd)/existing" scalar.repos
+'
+
+test_expect_success '`scalar delete` with existing repo' '
+	git init existing &&
+	scalar register existing &&
+	scalar delete existing &&
+	test_path_is_missing existing
+'
+
 test_done

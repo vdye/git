@@ -19,55 +19,75 @@ static int is_unattended(void) {
 	return git_env_bool("Scalar_UNATTENDED", 0);
 }
 
+/**
+ * Remove the deepest subdirectory in the provided path string. Path must not
+ * include a trailing path separator.
+ */
+static void strbuf_parentdir(struct strbuf *buf)
+{
+	char *path_sep = find_last_dir_sep(buf->buf);
+	strbuf_setlen(buf, path_sep ? path_sep - buf->buf : 0);
+}
+
+/**
+ * Given an absolute path at or below the enlistment root, find the
+ * enlistment root and working directory
+ */
+static void find_enlistment(struct strbuf *path,
+				   struct strbuf *enlistment_root)
+{
+	strbuf_addstr(path, "/src");
+	for (;;) {
+		size_t len = path->len;
+
+		strbuf_addstr(path, "/.git");
+		if (is_git_directory(path->buf)) {
+			strbuf_setlen(path, len);
+
+			if (enlistment_root) {
+				strbuf_addbuf(enlistment_root, path);
+				if (len >= 4 && is_dir_sep(path->buf[len - 4]) &&
+						!strncmp("src", path->buf + len - 3, 3))
+					strbuf_parentdir(enlistment_root);
+			}
+
+			break;
+		}
+
+		strbuf_setlen(path, len);
+		strbuf_parentdir(path);
+		if (!(path->len))
+			die(_("could not find enlistment root"));
+	}
+}
+
 static void setup_enlistment_directory(int argc, const char **argv,
 				       const char * const *usagestr,
-				       const struct option *options)
+				       const struct option *options,
+				       struct strbuf *enlistment_root)
 {
+	struct strbuf path = STRBUF_INIT;
+
 	if (startup_info->have_repository)
 		BUG("gitdir already set up?!?");
 
 	if (argc > 1)
 		usage_with_options(usagestr, options);
 
+	/* find the worktree, determine its corresponding root */
 	if (argc == 1) {
-		char *src = xstrfmt("%s/src", argv[0]);
-		const char *dir = is_directory(src) ? src : argv[0];
-
-		if (chdir(dir) < 0)
-			die_errno(_("could not switch to '%s'"), dir);
-
-		free(src);
-	} else {
-		/* find the worktree, and ensure that it is named `src` */
-		struct strbuf path = STRBUF_INIT;
-
-		if (strbuf_getcwd(&path) < 0)
-			die(_("need a working directory"));
-
-		for (;;) {
-			size_t len = path.len;
-
-			strbuf_addstr(&path, "/src/.git");
-			if (is_git_directory(path.buf)) {
-				strbuf_setlen(&path, len);
-				strbuf_addstr(&path, "/src");
-				if (chdir(path.buf) < 0)
-					die_errno(_("could not switch to '%s'"),
-						  path.buf);
-				strbuf_release(&path);
-				break;
-			}
-
-			while (len > 0 && !is_dir_sep(path.buf[--len]))
-				; /* keep looking for parent directory */
-
-			if (!len)
-				die(_("could not find enlistment root"));
-
-			strbuf_setlen(&path, len);
-		}
+		strbuf_add_absolute_path(&path, argv[0]);
+	} else if(strbuf_getcwd(&path) < 0) {
+		die(_("need a working directory"));
 	}
 
+	strbuf_trim_trailing_dir_sep(&path);
+	find_enlistment(&path, enlistment_root);
+
+	if (chdir(path.buf) < 0)
+		die_errno(_("could not switch to '%s'"), path.buf);
+
+	strbuf_release(&path);
 	setup_git_directory();
 }
 
@@ -789,17 +809,8 @@ static char *remote_default_branch(const char *url)
 	return NULL;
 }
 
-static void strbuf_parentdir(struct strbuf *buf)
+static int delete_enlistment(struct strbuf *enlistment)
 {
-	int len = buf->len;
-	while (len > 0 && !is_dir_sep(buf->buf[--len]))
-		; /* keep looking for parent directory */
-	strbuf_setlen(buf, len);
-}
-
-static int delete_enlistment(void)
-{
-	struct strbuf enlistment = STRBUF_INIT;
 #ifdef WIN32
 	struct strbuf parent = STRBUF_INIT;
 #endif
@@ -807,24 +818,19 @@ static int delete_enlistment(void)
 	if (unregister_dir())
 		die(_("failed to unregister repository"));
 
-	/* Compute the enlistment path (parent of the worktree) */
-	strbuf_addstr(&enlistment, the_repository->worktree);
-	strbuf_parentdir(&enlistment);
-
 #ifdef WIN32
 	/* Change current directory to one outside of the enlistment
 	   so that we may delete everything underneath it. */
-	strbuf_addbuf(&parent, &enlistment);
+	strbuf_addbuf(&parent, enlistment);
 	strbuf_parentdir(&parent);
 	if (chdir(parent.buf) < 0)
 		die_errno(_("could not switch to '%s'"), parent.buf);
 	strbuf_release(&parent);
 #endif
 
-	if (remove_dir_recursively(&enlistment, 0))
+	if (remove_dir_recursively(enlistment, 0))
 		die(_("failed to delete enlistment directory"));
 
-	strbuf_release(&enlistment);
 	return 0;
 }
 
@@ -1185,9 +1191,9 @@ static int cmd_diagnose(int argc, const char **argv)
 	argc = parse_options(argc, argv, NULL, options,
 			     usage, 0);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, &buf);
 
-	strbuf_addstr(&buf, "../.scalarDiagnostics/scalar_");
+	strbuf_addstr(&buf, "/.scalarDiagnostics/scalar_");
 	strbuf_addftime(&buf, "%Y%m%d_%H%M%S", localtime_r(&now, &tm), 0, 0);
 	if (run_git("init", "-q", "-b", "dummy", "--bare", buf.buf, NULL)) {
 		res = error(_("could not initialize temporary repository: %s"),
@@ -1299,7 +1305,7 @@ static int cmd_register(int argc, const char **argv)
 	argc = parse_options(argc, argv, NULL, options,
 			     usage, 0);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 	return register_dir();
 }
@@ -1335,7 +1341,7 @@ static int cmd_reconfigure(int argc, const char **argv)
 			     usage, 0);
 
 	if (!all) {
-		setup_enlistment_directory(argc, argv, usage, options);
+		setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 		return set_recommended_config(1);
 	}
@@ -1421,7 +1427,7 @@ static int cmd_run(int argc, const char **argv)
 
 	argc--;
 	argv++;
-	setup_enlistment_directory(argc, argv, usagestr, options);
+	setup_enlistment_directory(argc, argv, usagestr, options, NULL);
 	strbuf_release(&buf);
 
 	if (i == 0)
@@ -1438,6 +1444,24 @@ static int cmd_run(int argc, const char **argv)
 			    "--task", tasks[i].task, NULL))
 			return -1;
 	return 0;
+}
+
+static int remove_deleted_enlistment(struct strbuf *path)
+{
+	int res = 0;
+	strbuf_realpath_forgiving(path, path->buf, 1);
+
+	if (run_git("config", "--global",
+			"--unset", "--fixed-value",
+			"scalar.repo", path->buf, NULL) < 0)
+		res = -1;
+
+	if (run_git("config", "--global",
+			"--unset", "--fixed-value",
+			"maintenance.repo", path->buf, NULL) < 0)
+		res = -1;
+
+	return res;
 }
 
 static int cmd_unregister(int argc, const char **argv)
@@ -1459,32 +1483,30 @@ static int cmd_unregister(int argc, const char **argv)
 	 * mistake and _still_ wants to unregister the thing.
 	 */
 	if (argc == 1) {
-		struct strbuf path = STRBUF_INIT;
+		struct strbuf src_path = STRBUF_INIT, workdir_path = STRBUF_INIT;
 
-		strbuf_addf(&path, "%s/src/.git", argv[0]);
-		if (!is_directory(path.buf)) {
-			int res = 0;
+		strbuf_addf(&src_path, "%s/src/.git", argv[0]);
+		strbuf_addf(&workdir_path, "%s/.git", argv[0]);
+		if (!is_directory(src_path.buf) && !is_directory(workdir_path.buf)) {
+			/* Neither <arg>/src/.git nor <arg>/.git exist - remove any
+			 * possible matching registrations */
+			int res = -1;
 
-			strbuf_strip_suffix(&path, "/.git");
-			strbuf_realpath_forgiving(&path, path.buf, 1);
+			strbuf_strip_suffix(&src_path, "/.git");
+			res = remove_deleted_enlistment(&src_path) && res;
 
-			if (run_git("config", "--global",
-				    "--unset", "--fixed-value",
-				    "scalar.repo", path.buf, NULL) < 0)
-				res = -1;
+			strbuf_strip_suffix(&workdir_path, "/.git");
+			res = remove_deleted_enlistment(&workdir_path) && res;
 
-			if (run_git("config", "--global",
-				    "--unset", "--fixed-value",
-				    "maintenance.repo", path.buf, NULL) < 0)
-				res = -1;
-
-			strbuf_release(&path);
+			strbuf_release(&src_path);
+			strbuf_release(&workdir_path);
 			return res;
 		}
-		strbuf_release(&path);
+		strbuf_release(&src_path);
+		strbuf_release(&workdir_path);
 	}
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 	return unregister_dir();
 }
@@ -1498,6 +1520,8 @@ static int cmd_delete(int argc, const char **argv)
 		N_("scalar delete <enlistment>"),
 		NULL
 	};
+	struct strbuf enlistment = STRBUF_INIT;
+	int res = 0;
 
 	argc = parse_options(argc, argv, NULL, options,
 			     usage, 0);
@@ -1505,9 +1529,12 @@ static int cmd_delete(int argc, const char **argv)
 	if (argc != 1)
 		usage_with_options(usage, options);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, &enlistment);
 
-	return delete_enlistment();
+	res = delete_enlistment(&enlistment);
+	strbuf_release(&enlistment);
+
+	return res;
 }
 
 static int cmd_help(int argc, const char **argv)
@@ -1586,7 +1613,7 @@ static int cmd_cache_server(int argc, const char **argv)
 		usage_msg_opt(_("--get/--set/--list are mutually exclusive"),
 			      usage, options);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 	if (list) {
 		const char *name = list, *url = list;
