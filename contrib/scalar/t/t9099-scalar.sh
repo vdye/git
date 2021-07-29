@@ -204,6 +204,17 @@ test_expect_success '`scalar clone` with GVFS-enabled server' '
 	)
 '
 
+test_expect_success '`scalar register` parallel to worktree' '
+	git init test-repo/src &&
+	mkdir -p test-repo/out &&
+	scalar register test-repo/out &&
+	git config --get --global --fixed-value \
+		maintenance.repo "$(pwd)/test-repo/src" &&
+	scalar list >scalar.repos &&
+	grep -F "$(pwd)/test-repo/src" scalar.repos &&
+	scalar delete test-repo
+'
+
 test_expect_success '`scalar register` & `unregister` with existing repo' '
 	git init existing &&
 	scalar register existing &&

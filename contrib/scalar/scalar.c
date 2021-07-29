@@ -33,32 +33,56 @@ static void strbuf_parentdir(struct strbuf *buf)
  * Given an absolute path at or below the enlistment root, find the
  * enlistment root and working directory
  */
-static void find_enlistment(struct strbuf *path,
-				   struct strbuf *enlistment_root)
+static int find_enlistment(struct strbuf *path,
+			   struct strbuf *enlistment_root)
 {
-	strbuf_addstr(path, "/src");
-	for (;;) {
-		size_t len = path->len;
+	char *base_dir;
+	while (path->len) {
+		const size_t len = path->len;
 
+		/* check if currently in enlistment root with src/ workdir */
+		strbuf_addstr(path, "/src/.git");
+		if (is_git_directory(path->buf)) {
+			strbuf_strip_suffix(path, "/.git");
+
+			if (enlistment_root) {
+				strbuf_addbuf(enlistment_root, path);
+				strbuf_parentdir(enlistment_root);
+			}
+
+			return 0;
+		}
+
+		/* reset to original path */
+		strbuf_setlen(path, len);
+
+		/* check if currently in workdir */
 		strbuf_addstr(path, "/.git");
 		if (is_git_directory(path->buf)) {
 			strbuf_setlen(path, len);
 
 			if (enlistment_root) {
 				strbuf_addbuf(enlistment_root, path);
-				if (len >= 4 && is_dir_sep(path->buf[len - 4]) &&
-						!strncmp("src", path->buf + len - 3, 3))
+
+				base_dir = find_last_dir_sep(enlistment_root->buf);
+				if (!base_dir)
+					base_dir = enlistment_root->buf;
+				else
+					base_dir++;
+
+				if (!strcmp(base_dir, "src"))
 					strbuf_parentdir(enlistment_root);
 			}
 
-			break;
+			return 0;
 		}
 
+		/* reset path to parent */
 		strbuf_setlen(path, len);
 		strbuf_parentdir(path);
-		if (!(path->len))
-			die(_("could not find enlistment root"));
 	}
+
+	return -1;
 }
 
 static void setup_enlistment_directory(int argc, const char **argv,
@@ -82,7 +106,8 @@ static void setup_enlistment_directory(int argc, const char **argv,
 	}
 
 	strbuf_trim_trailing_dir_sep(&path);
-	find_enlistment(&path, enlistment_root);
+	if (!!find_enlistment(&path, enlistment_root))
+		die(_("could not find enlistment root"));
 
 	if (chdir(path.buf) < 0)
 		die_errno(_("could not switch to '%s'"), path.buf);
@@ -1488,8 +1513,7 @@ static int cmd_unregister(int argc, const char **argv)
 		strbuf_addf(&src_path, "%s/src/.git", argv[0]);
 		strbuf_addf(&workdir_path, "%s/.git", argv[0]);
 		if (!is_directory(src_path.buf) && !is_directory(workdir_path.buf)) {
-			/* Neither <arg>/src/.git nor <arg>/.git exist - remove any
-			 * possible matching registrations */
+			/* remove possible matching registrations */
 			int res = -1;
 
 			strbuf_strip_suffix(&src_path, "/.git");
