@@ -25,8 +25,9 @@ static int is_unattended(void) {
  */
 static void strbuf_parentdir(struct strbuf *buf)
 {
-	char *path_sep = find_last_dir_sep(buf->buf);
-	strbuf_setlen(buf, path_sep ? path_sep - buf->buf : 0);
+	size_t offset = offset_1st_component(buf->buf);
+	char *path_sep = find_last_dir_sep(buf->buf + offset);
+	strbuf_setlen(buf, path_sep ? path_sep - buf->buf : offset);
 }
 
 /**
@@ -37,7 +38,8 @@ static int find_enlistment(struct strbuf *path,
 			   struct strbuf *enlistment_root)
 {
 	char *base_dir;
-	while (path->len) {
+	size_t offset = offset_1st_component(path->buf);
+	do {
 		const size_t len = path->len;
 
 		/* check if currently in enlistment root with src/ workdir */
@@ -64,14 +66,10 @@ static int find_enlistment(struct strbuf *path,
 			if (enlistment_root) {
 				strbuf_addbuf(enlistment_root, path);
 
-				base_dir = find_last_dir_sep(enlistment_root->buf);
-				if (!base_dir)
-					base_dir = enlistment_root->buf;
-				else
-					base_dir++;
-
-				if (!strcmp(base_dir, "src"))
-					strbuf_parentdir(enlistment_root);
+				base_dir = find_last_dir_sep(enlistment_root->buf + offset);
+				if (base_dir && !strcmp(base_dir + 1, "src"))
+					strbuf_setlen(enlistment_root,
+						base_dir - enlistment_root->buf);
 			}
 
 			return 0;
@@ -80,7 +78,7 @@ static int find_enlistment(struct strbuf *path,
 		/* reset path to parent */
 		strbuf_setlen(path, len);
 		strbuf_parentdir(path);
-	}
+	} while (path->len > offset);
 
 	return -1;
 }
