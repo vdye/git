@@ -148,6 +148,8 @@ jobs:
   windows_artifacts:
     runs-on: windows-latest
     needs: [prereqs, windows_pkg]
+    env:
+      HOME: "${{github.workspace}}\\home"
     strategy:
       matrix:
         artifact:
