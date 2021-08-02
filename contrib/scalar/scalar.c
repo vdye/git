@@ -21,24 +21,28 @@ static int is_unattended(void) {
 
 /**
  * Remove the deepest subdirectory in the provided path string. Path must not
- * include a trailing path separator.
+ * include a trailing path separator. Returns 1 if parent directory found,
+ * otherwise 0.
  */
-static void strbuf_parentdir(struct strbuf *buf)
+static int strbuf_parentdir(struct strbuf *buf)
 {
+	size_t len = buf->len;
 	size_t offset = offset_1st_component(buf->buf);
 	char *path_sep = find_last_dir_sep(buf->buf + offset);
 	strbuf_setlen(buf, path_sep ? path_sep - buf->buf : offset);
+
+	return (buf->len < len);
 }
 
 /**
  * Given an absolute path at or below the enlistment root, find the
- * enlistment root and working directory
+ * enlistment root and working directory. Returns 1 if enlistment found,
+ * otherwise 0.
  */
 static int find_enlistment(struct strbuf *path,
 			   struct strbuf *enlistment_root)
 {
-	char *base_dir;
-	size_t offset = offset_1st_component(path->buf);
+	char *root;
 	do {
 		const size_t len = path->len;
 
@@ -47,12 +51,10 @@ static int find_enlistment(struct strbuf *path,
 		if (is_git_directory(path->buf)) {
 			strbuf_strip_suffix(path, "/.git");
 
-			if (enlistment_root) {
-				strbuf_addbuf(enlistment_root, path);
-				strbuf_parentdir(enlistment_root);
-			}
+			if (enlistment_root)
+				strbuf_add(enlistment_root, path->buf, len);
 
-			return 0;
+			return 1;
 		}
 
 		/* reset to original path */
@@ -64,23 +66,22 @@ static int find_enlistment(struct strbuf *path,
 			strbuf_setlen(path, len);
 
 			if (enlistment_root) {
-				strbuf_addbuf(enlistment_root, path);
-
-				base_dir = find_last_dir_sep(enlistment_root->buf + offset);
-				if (base_dir && !strcmp(base_dir + 1, "src"))
-					strbuf_setlen(enlistment_root,
-						base_dir - enlistment_root->buf);
+				/*
+				* If the worktree's directory's name is `src`, the enlistment is the
+				* parent directory, otherwise it is identical to the worktree.
+				*/
+				root = strip_path_suffix(path->buf, "src");
+				strbuf_addstr(enlistment_root, root ? root : path->buf);
+				free(root);
 			}
 
-			return 0;
+			return 1;
 		}
 
-		/* reset path to parent */
 		strbuf_setlen(path, len);
-		strbuf_parentdir(path);
-	} while (path->len > offset);
+	} while (strbuf_parentdir(path));
 
-	return -1;
+	return 0;
 }
 
 static void setup_enlistment_directory(int argc, const char **argv,
@@ -104,7 +105,7 @@ static void setup_enlistment_directory(int argc, const char **argv,
 	}
 
 	strbuf_trim_trailing_dir_sep(&path);
-	if (!!find_enlistment(&path, enlistment_root))
+	if (!find_enlistment(&path, enlistment_root))
 		die(_("could not find enlistment root"));
 
 	if (chdir(path.buf) < 0)
