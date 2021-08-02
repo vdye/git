@@ -187,24 +187,23 @@ jobs:
         run: |
           set -x
 
-          eval /usr/src/build-extra/please.sh make_installers_from_mingw_w64_git --version=${{ needs.prereqs.outputs.tag_version }} -o artifacts --${{matrix.artifact.name}} --pkg=pkg-x86_64/mingw-w64-x86_64-git-[0-9]*.tar.xz --pkg=pkg-x86_64/mingw-w64-x86_64-git-doc-html-[0-9]*.tar.xz &&
+          # Copy the PDB archive to the directory where `--include-pdbs` expects it
+          b=/usr/src/build-extra &&
+          mkdir -p $b/cached-source-packages &&
+          cp pkg-x86_64/*-pdb* $b/cached-source-packages/ &&
+
+          # Build the installer, embedding PDBs
+          eval $b/please.sh make_installers_from_mingw_w64_git --include-pdbs \
+              --version=${{ needs.prereqs.outputs.tag_version }} \
+              -o artifacts --${{matrix.artifact.name}} \
+              --pkg=pkg-x86_64/mingw-w64-x86_64-git-[0-9]*.tar.xz \
+              --pkg=pkg-x86_64/mingw-w64-x86_64-git-doc-html-[0-9]*.tar.xz &&
+
           if test portable = '${{matrix.artifact.name}}' && test -n "$(git config alias.signtool)"
           then
             git signtool artifacts/PortableGit-*.exe
           fi &&
           openssl dgst -sha256 artifacts/${{matrix.artifact.fileprefix}}-*.exe | sed "s/.* //" >artifacts/sha-256.txt
-      - name: Copy package-versions and pdbs
-        if: matrix.artifact.name == 'installer'
-        shell: bash
-        run: |
-          cp /usr/src/build-extra/installer/package-versions.txt artifacts/ &&
-
-          a=$PWD/artifacts &&
-          p=$PWD/pkg-x86_64 &&
-          (cd /usr/src/build-extra &&
-          mkdir -p cached-source-packages &&
-          cp "$p"/*-pdb* cached-source-packages/ &&
-          GIT_CONFIG_PARAMETERS="'windows.sdk64.path='" ./please.sh bundle_pdbs --arch=x86_64 --directory="$a" installer/package-versions.txt)
       - name: Publish ${{matrix.artifact.name}}-x86_64
         uses: actions/upload-artifact@v2
         with:
