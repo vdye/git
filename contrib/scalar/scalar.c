@@ -31,57 +31,7 @@ static int strbuf_parentdir(struct strbuf *buf)
 	char *path_sep = find_last_dir_sep(buf->buf + offset);
 	strbuf_setlen(buf, path_sep ? path_sep - buf->buf : offset);
 
-	return (buf->len < len);
-}
-
-/**
- * Given an absolute path at or below the enlistment root, find the
- * enlistment root and working directory. Returns 1 if enlistment found,
- * otherwise 0.
- */
-static int find_enlistment(struct strbuf *path,
-			   struct strbuf *enlistment_root)
-{
-	char *root;
-	do {
-		const size_t len = path->len;
-
-		/* check if currently in enlistment root with src/ workdir */
-		strbuf_addstr(path, "/src/.git");
-		if (is_git_directory(path->buf)) {
-			strbuf_strip_suffix(path, "/.git");
-
-			if (enlistment_root)
-				strbuf_add(enlistment_root, path->buf, len);
-
-			return 1;
-		}
-
-		/* reset to original path */
-		strbuf_setlen(path, len);
-
-		/* check if currently in workdir */
-		strbuf_addstr(path, "/.git");
-		if (is_git_directory(path->buf)) {
-			strbuf_setlen(path, len);
-
-			if (enlistment_root) {
-				/*
-				* If the worktree's directory's name is `src`, the enlistment is the
-				* parent directory, otherwise it is identical to the worktree.
-				*/
-				root = strip_path_suffix(path->buf, "src");
-				strbuf_addstr(enlistment_root, root ? root : path->buf);
-				free(root);
-			}
-
-			return 1;
-		}
-
-		strbuf_setlen(path, len);
-	} while (strbuf_parentdir(path));
-
-	return 0;
+	return buf->len < len;
 }
 
 static void setup_enlistment_directory(int argc, const char **argv,
@@ -90,6 +40,8 @@ static void setup_enlistment_directory(int argc, const char **argv,
 				       struct strbuf *enlistment_root)
 {
 	struct strbuf path = STRBUF_INIT;
+	char *root;
+	int enlistment_found = 0;
 
 	if (startup_info->have_repository)
 		BUG("gitdir already set up?!?");
@@ -105,7 +57,47 @@ static void setup_enlistment_directory(int argc, const char **argv,
 	}
 
 	strbuf_trim_trailing_dir_sep(&path);
-	if (!find_enlistment(&path, enlistment_root))
+	do {
+		const size_t len = path.len;
+
+		/* check if currently in enlistment root with src/ workdir */
+		strbuf_addstr(&path, "/src/.git");
+		if (is_git_directory(path.buf)) {
+			strbuf_strip_suffix(&path, "/.git");
+
+			if (enlistment_root)
+				strbuf_add(enlistment_root, path.buf, len);
+
+			enlistment_found = 1;
+			break;
+		}
+
+		/* reset to original path */
+		strbuf_setlen(&path, len);
+
+		/* check if currently in workdir */
+		strbuf_addstr(&path, "/.git");
+		if (is_git_directory(path.buf)) {
+			strbuf_setlen(&path, len);
+
+			if (enlistment_root) {
+				/*
+				* If the worktree's directory's name is `src`, the enlistment is the
+				* parent directory, otherwise it is identical to the worktree.
+				*/
+				root = strip_path_suffix(path.buf, "src");
+				strbuf_addstr(enlistment_root, root ? root : path.buf);
+				free(root);
+			}
+
+			enlistment_found = 1;
+			break;
+		}
+
+		strbuf_setlen(&path, len);
+	} while (strbuf_parentdir(&path));
+
+	if (!enlistment_found)
 		die(_("could not find enlistment root"));
 
 	if (chdir(path.buf) < 0)
