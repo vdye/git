@@ -1628,7 +1628,7 @@ static int cmd_cache_server(int argc, const char **argv)
 		usage_msg_opt(_("--get/--set/--list are mutually exclusive"),
 			      usage, options);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 	if (list) {
 		const char *name = list, *url = list;
