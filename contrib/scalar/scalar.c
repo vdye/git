@@ -825,17 +825,8 @@ static char *remote_default_branch(const char *url)
 	return NULL;
 }
 
-static void strbuf_parentdir(struct strbuf *buf)
+static int delete_enlistment(struct strbuf *enlistment)
 {
-	int len = buf->len;
-	while (len > 0 && !is_dir_sep(buf->buf[--len]))
-		; /* keep looking for parent directory */
-	strbuf_setlen(buf, len);
-}
-
-static int delete_enlistment(void)
-{
-	struct strbuf enlistment = STRBUF_INIT;
 #ifdef WIN32
 	struct strbuf parent = STRBUF_INIT;
 #endif
@@ -843,24 +834,19 @@ static int delete_enlistment(void)
 	if (unregister_dir())
 		die(_("failed to unregister repository"));
 
-	/* Compute the enlistment path (parent of the worktree) */
-	strbuf_addstr(&enlistment, the_repository->worktree);
-	strbuf_parentdir(&enlistment);
-
 #ifdef WIN32
 	/* Change current directory to one outside of the enlistment
 	   so that we may delete everything underneath it. */
-	strbuf_addbuf(&parent, &enlistment);
+	strbuf_addbuf(&parent, enlistment);
 	strbuf_parentdir(&parent);
 	if (chdir(parent.buf) < 0)
 		die_errno(_("could not switch to '%s'"), parent.buf);
 	strbuf_release(&parent);
 #endif
 
-	if (remove_dir_recursively(&enlistment, 0))
+	if (remove_dir_recursively(enlistment, 0))
 		die(_("failed to delete enlistment directory"));
 
-	strbuf_release(&enlistment);
 	return 0;
 }
 
@@ -1549,6 +1535,8 @@ static int cmd_delete(int argc, const char **argv)
 		N_("scalar delete <enlistment>"),
 		NULL
 	};
+	struct strbuf enlistment = STRBUF_INIT;
+	int res = 0;
 
 	argc = parse_options(argc, argv, NULL, options,
 			     usage, 0);
@@ -1556,9 +1544,12 @@ static int cmd_delete(int argc, const char **argv)
 	if (argc != 1)
 		usage_with_options(usage, options);
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, &enlistment);
 
-	return delete_enlistment();
+	res = delete_enlistment(&enlistment);
+	strbuf_release(&enlistment);
+
+	return res;
 }
 
 static int cmd_help(int argc, const char **argv)
