@@ -1476,6 +1476,24 @@ static int cmd_run(int argc, const char **argv)
 	return 0;
 }
 
+static int remove_deleted_enlistment(struct strbuf *path)
+{
+	int res = 0;
+	strbuf_realpath_forgiving(path, path->buf, 1);
+
+	if (run_git("config", "--global",
+		    "--unset", "--fixed-value",
+		    "scalar.repo", path->buf, NULL) < 0)
+		res = -1;
+
+	if (run_git("config", "--global",
+		    "--unset", "--fixed-value",
+		    "maintenance.repo", path->buf, NULL) < 0)
+		res = -1;
+
+	return res;
+}
+
 static int cmd_unregister(int argc, const char **argv)
 {
 	struct option options[] = {
@@ -1495,29 +1513,26 @@ static int cmd_unregister(int argc, const char **argv)
 	 * mistake and _still_ wants to unregister the thing.
 	 */
 	if (argc == 1) {
-		struct strbuf path = STRBUF_INIT;
+		struct strbuf src_path = STRBUF_INIT, workdir_path = STRBUF_INIT;
 
-		strbuf_addf(&path, "%s/src/.git", argv[0]);
-		if (!is_directory(path.buf)) {
-			int res = 0;
+		strbuf_addf(&src_path, "%s/src/.git", argv[0]);
+		strbuf_addf(&workdir_path, "%s/.git", argv[0]);
+		if (!is_directory(src_path.buf) && !is_directory(workdir_path.buf)) {
+			/* remove possible matching registrations */
+			int res = -1;
 
-			strbuf_strip_suffix(&path, "/.git");
-			strbuf_realpath_forgiving(&path, path.buf, 1);
+			strbuf_strip_suffix(&src_path, "/.git");
+			res = remove_deleted_enlistment(&src_path) && res;
 
-			if (run_git("config", "--global",
-				    "--unset", "--fixed-value",
-				    "scalar.repo", path.buf, NULL) < 0)
-				res = -1;
+			strbuf_strip_suffix(&workdir_path, "/.git");
+			res = remove_deleted_enlistment(&workdir_path) && res;
 
-			if (run_git("config", "--global",
-				    "--unset", "--fixed-value",
-				    "maintenance.repo", path.buf, NULL) < 0)
-				res = -1;
-
-			strbuf_release(&path);
+			strbuf_release(&src_path);
+			strbuf_release(&workdir_path);
 			return res;
 		}
-		strbuf_release(&path);
+		strbuf_release(&src_path);
+		strbuf_release(&workdir_path);
 	}
 
 	setup_enlistment_directory(argc, argv, usage, options, NULL);
