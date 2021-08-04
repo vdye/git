@@ -1520,7 +1520,7 @@ static int cmd_unregister(int argc, const char **argv)
 		strbuf_release(&path);
 	}
 
-	setup_enlistment_directory(argc, argv, usage, options);
+	setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 	return unregister_dir();
 }
