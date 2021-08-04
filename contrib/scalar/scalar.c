@@ -1371,7 +1371,7 @@ static int cmd_reconfigure(int argc, const char **argv)
 			     usage, 0);
 
 	if (!all) {
-		setup_enlistment_directory(argc, argv, usage, options);
+		setup_enlistment_directory(argc, argv, usage, options, NULL);
 
 		return set_recommended_config(1);
 	}
