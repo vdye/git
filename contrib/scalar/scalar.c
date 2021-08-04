@@ -1457,7 +1457,7 @@ static int cmd_run(int argc, const char **argv)
 
 	argc--;
 	argv++;
-	setup_enlistment_directory(argc, argv, usagestr, options);
+	setup_enlistment_directory(argc, argv, usagestr, options, NULL);
 	strbuf_release(&buf);
 
 	if (i == 0)
