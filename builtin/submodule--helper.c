@@ -590,7 +590,7 @@ static int module_foreach(int argc, const char **argv, const char *prefix)
 	return 0;
 }
 
-static char *compute_submodule_clone_url(const char *rel_url)
+static char *compute_submodule_clone_url(const char *rel_url, const char *up_path, int quiet)
 {
 	char *remoteurl, *relurl;
 	char *remote = get_default_remote();
@@ -598,10 +598,14 @@ static char *compute_submodule_clone_url(const char *rel_url)
 
 	strbuf_addf(&remotesb, "remote.%s.url", remote);
 	if (git_config_get_string(remotesb.buf, &remoteurl)) {
-		warning(_("could not look up configuration '%s'. Assuming this repository is its own authoritative upstream."), remotesb.buf);
+		if (!quiet)
+			warning(_("could not look up configuration '%s'. "
+				  "Assuming this repository is its own "
+				  "authoritative upstream."),
+				remotesb.buf);
 		remoteurl = xgetcwd();
 	}
-	relurl = relative_url(remoteurl, rel_url, NULL);
+	relurl = relative_url(remoteurl, rel_url, up_path);
 
 	free(remote);
 	free(remoteurl);
@@ -660,7 +664,7 @@ static void init_submodule(const char *path, const char *prefix,
 		if (starts_with_dot_dot_slash(url) ||
 		    starts_with_dot_slash(url)) {
 			char *oldurl = url;
-			url = compute_submodule_clone_url(oldurl);
+			url = compute_submodule_clone_url(oldurl, NULL, 0);
 			free(oldurl);
 		}
 
@@ -2134,7 +2138,7 @@ static int prepare_to_clone_next_submodule(const struct cache_entry *ce,
 	if (repo_config_get_string_tmp(the_repository, sb.buf, &url)) {
 		if (starts_with_dot_slash(sub->url) ||
 		    starts_with_dot_dot_slash(sub->url)) {
-			url = compute_submodule_clone_url(sub->url);
+			url = compute_submodule_clone_url(sub->url, NULL, 0);
 			need_free_url = 1;
 		} else
 			url = sub->url;
