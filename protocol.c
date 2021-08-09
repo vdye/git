@@ -89,5 +89,6 @@ enum protocol_version determine_protocol_version_client(const char *server_respo
 			die("protocol error: server explicitly said version 0");
 	}
 
+	trace2_data_intmax("transfer", NULL, "negotiated-version", version);
 	return version;
 }
