@@ -397,25 +397,22 @@ static void free_message(struct commit *commit, struct commit_message *msg)
 	unuse_commit_buffer(commit, msg->message);
 }
 
-static void print_advice(struct repository *r, int show_hint,
-			 struct replay_opts *opts)
+static void print_advice(struct replay_opts *opts, int show_hint)
 {
 	char *msg = getenv("GIT_CHERRY_PICK_HELP");
 
 	if (msg) {
-		fprintf(stderr, "%s\n", msg);
-		/*
-		 * A conflict has occurred but the porcelain
-		 * (typically rebase --interactive) wants to take care
-		 * of the commit itself so remove CHERRY_PICK_HEAD
-		 */
-		refs_delete_ref(get_main_ref_store(r), "", "CHERRY_PICK_HEAD",
-				NULL, 0);
-		return;
-	}
+		advise("%s\n", msg);
+	} else if (show_hint) {
+		if (opts->action == REPLAY_PICK) {
+			advise(_("Resolve all conflicts manually, mark them as resolved with\n"
+				 "\"git add/rm <conflicted_files>\", then run\n"
+				 "\"git cherry-pick --continue\".\n"
+				 "You can instead skip this commit: run \"git cherry-pick --skip\".\n"
+				 "To abort and get back to the state before \"git cherry-pick\",\n"
+				 "run \"git cherry-pick --abort\"."));
 
-	if (show_hint) {
-		if (opts->no_commit)
+		} else if (opts->no_commit)
 			advise(_("after resolving the conflicts, mark the corrected paths\n"
 				 "with 'git add <paths>' or 'git rm <paths>'"));
 		else
@@ -2265,7 +2262,16 @@ static int do_pick_commit(struct repository *r,
 		      ? _("could not revert %s... %s")
 		      : _("could not apply %s... %s"),
 		      short_commit_name(commit), msg.subject);
-		print_advice(r, res == 1, opts);
+		print_advice(opts, res == 1);
+		if (opts->delete_cherry_pick_head) {
+			/*
+			 * A conflict has occurred but the porcelain
+			 * (typically rebase --interactive) wants to take care
+			 * of the commit itself so remove CHERRY_PICK_HEAD
+			 */
+			refs_delete_ref(get_main_ref_store(r), "", "CHERRY_PICK_HEAD",
+					NULL, 0);
+		}
 		repo_rerere(r, opts->allow_rerere_auto);
 		goto leave;
 	}

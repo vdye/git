@@ -444,7 +444,7 @@ pick_one_preserving_merges () {
 			output eval git cherry-pick $allow_rerere_autoupdate \
 				$allow_empty_message \
 				${gpg_sign_opt:+$(git rev-parse --sq-quote "$gpg_sign_opt")} \
-				"$strategy_args" "$@" ||
+				"$strategy_args" --delete-cherry-pick-head "$@" ||
 				die_with_patch $sha1 "$(eval_gettext "Could not pick \$sha1")"
 			;;
 		esac

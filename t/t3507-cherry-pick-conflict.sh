@@ -53,9 +53,12 @@ test_expect_success 'advice from failed cherry-pick' "
 	picked=\$(git rev-parse --short picked) &&
 	cat <<-EOF >expected &&
 	error: could not apply \$picked... picked
-	hint: after resolving the conflicts, mark the corrected paths
-	hint: with 'git add <paths>' or 'git rm <paths>'
-	hint: and commit the result with 'git commit'
+	hint: Resolve all conflicts manually, mark them as resolved with
+	hint: \"git add/rm <conflicted_files>\", then run
+	hint: \"git cherry-pick --continue\".
+	hint: You can instead skip this commit: run \"git cherry-pick --skip\".
+	hint: To abort and get back to the state before \"git cherry-pick\",
+	hint: run \"git cherry-pick --abort\".
 	EOF
 	test_must_fail git cherry-pick picked 2>actual &&
 
@@ -68,18 +71,43 @@ test_expect_success 'advice from failed cherry-pick --no-commit' "
 	picked=\$(git rev-parse --short picked) &&
 	cat <<-EOF >expected &&
 	error: could not apply \$picked... picked
-	hint: after resolving the conflicts, mark the corrected paths
-	hint: with 'git add <paths>' or 'git rm <paths>'
+	hint: Resolve all conflicts manually, mark them as resolved with
+	hint: \"git add/rm <conflicted_files>\", then run
+	hint: \"git cherry-pick --continue\".
+	hint: You can instead skip this commit: run \"git cherry-pick --skip\".
+	hint: To abort and get back to the state before \"git cherry-pick\",
+	hint: run \"git cherry-pick --abort\".
 	EOF
 	test_must_fail git cherry-pick --no-commit picked 2>actual &&
 
 	test_cmp expected actual
 "
 
+test_expect_success 'advice from failed cherry-pick with GIT_CHERRY_PICK_HELP' "
+	pristine_detach initial &&
+	(
+		picked=\$(git rev-parse --short picked) &&
+		cat <<-EOF >expected &&
+		error: could not apply \$picked... picked
+		hint: and then do something else
+		EOF
+		GIT_CHERRY_PICK_HELP='and then do something else' &&
+		export GIT_CHERRY_PICK_HELP &&
+		test_must_fail git cherry-pick picked 2>actual &&
+		test_cmp expected actual
+	)
+"
+
 test_expect_success 'failed cherry-pick sets CHERRY_PICK_HEAD' '
 	pristine_detach initial &&
 	test_must_fail git cherry-pick picked &&
 	test_cmp_rev picked CHERRY_PICK_HEAD
+'
+
+test_expect_success 'failed cherry-pick with --delete-cherry-pick-head does not set CHERRY_PICK_HEAD' '
+	pristine_detach initial &&
+	test_must_fail git cherry-pick --delete-cherry-pick-head picked &&
+	test_must_fail git rev-parse --verify CHERRY_PICK_HEAD
 '
 
 test_expect_success 'successful cherry-pick does not set CHERRY_PICK_HEAD' '
@@ -106,16 +134,6 @@ test_expect_success \
 	pristine_detach initial &&
 	echo foo >foo &&
 	test_must_fail git cherry-pick --strategy=resolve base &&
-	test_must_fail git rev-parse --verify CHERRY_PICK_HEAD
-'
-
-test_expect_success 'GIT_CHERRY_PICK_HELP suppresses CHERRY_PICK_HEAD' '
-	pristine_detach initial &&
-	(
-		GIT_CHERRY_PICK_HELP="and then do something else" &&
-		export GIT_CHERRY_PICK_HELP &&
-		test_must_fail git cherry-pick picked
-	) &&
 	test_must_fail git rev-parse --verify CHERRY_PICK_HEAD
 '
 
