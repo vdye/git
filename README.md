@@ -141,7 +141,7 @@ Please use the most recent
 you can download a specific version as follows:
 
 ```shell
-wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.32.0.vfs.0.2/git-vfs_2.32.0.vfs.0.2.deb
+wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.33.0.vfs.0.0/microsoft-git_2.33.0.vfs.0.0.deb
 sudo dpkg -i microsoft-git.deb
 ```
 
