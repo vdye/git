@@ -182,6 +182,75 @@ jobs:
           echo -n "$CODESIGN_P12" | tr % '\n' | base64 -d >home/.sig/codesign.p12 &&
           echo -n "$CODESIGN_PASS" >home/.sig/codesign.pass &&
           git config --global alias.signtool '!sh "/usr/src/build-extra/signtool.sh"'
+      - name: Retarget auto-update to microsoft/git
+        shell: bash
+        run: |
+          set -x
+
+          b=/usr/src/build-extra &&
+
+          filename=$b/git-update-git-for-windows.config
+          tr % '\t' >$filename <<-\EOF
+          [update]
+          %fromFork = microsoft/git
+          EOF &&
+
+          sed -i -e '/^#include "file-list.iss"/a\
+          Source: {#SourcePath}\\..\\'$filename'; DestDir: {app}\\mingw64\\bin; Flags: replacesameversion; AfterInstall: DeleteFromVirtualStore' \
+            -e '/^Type: dirifempty; Name: {app}\\{#MINGW_BITNESS}$/i\
+          Type: files; Name: {app}\\{#MINGW_BITNESS}\\bin\\git-update-git-for-windows.config\
+          Type: dirifempty; Name: {app}\\{#MINGW_BITNESS}\\bin' \
+            $b/installer/install.iss
+      - name: Set the installer Publisher to the Git Fundamentals team
+        shell: bash
+        run: |
+          b=/usr/src/build-extra &&
+          sed -i -e 's/^\(AppPublisher=\).*/\1The Git Fundamentals Team at GitHub/' $b/installer/install.iss
+      - name: Let the installer configure Visual Studio to use the installed Git
+        shell: bash
+        run: |
+          set -x
+
+          b=/usr/src/build-extra &&
+
+          sed -i -e '/^ *InstallAutoUpdater();$/a\
+              CustomPostInstall();' \
+            -e '/^ *UninstallAutoUpdater();$/a\
+              CustomPostUninstall();' \
+            $b/installer/install.iss &&
+
+          cat >>$b/installer/helpers.inc.iss <<\EOF
+
+          procedure CustomPostInstall();
+          begin
+              if not RegWriteStringValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\15.0\TeamFoundation\GitSourceControl','GitPath',ExpandConstant('{app}')) or
+                not RegWriteStringValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\16.0\TeamFoundation\GitSourceControl','GitPath',ExpandConstant('{app}')) or
+                not RegWriteStringValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\17.0\TeamFoundation\GitSourceControl','GitPath',ExpandConstant('{app}')) then
+                  LogError('Could not register TeamFoundation\GitSourceControl');
+          end;
+
+          procedure CustomPostUninstall();
+          begin
+              if not RegDeleteValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\15.0\TeamFoundation\GitSourceControl','GitPath') or
+                not RegDeleteValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\16.0\TeamFoundation\GitSourceControl','GitPath') or
+                not RegDeleteValue(HKEY_CURRENT_USER,'Software\Microsoft\VSCommon\17.0\TeamFoundation\GitSourceControl','GitPath') then
+                  LogError('Could not register TeamFoundation\GitSourceControl');
+          end;
+          EOF
+      - name: Enable Scalar/C and the auto-updater in the installer by default
+        shell: bash
+        run: |
+          set -x
+
+          b=/usr/src/build-extra &&
+
+          sed -i -e "/ChosenOptions:=''/a\\
+              if (ExpandConstant('{param:components|/}')='/') then begin\n\
+                  WizardSelectComponents('autoupdate');\n\
+          #ifdef WITH_SCALAR\n\
+                  WizardSelectComponents('scalar');\n\
+          #endif\n\
+              end;" $b/installer/install.iss
       - name: Build 64-bit ${{matrix.artifact.name}}
         shell: bash
         run: |
@@ -302,7 +371,7 @@ jobs:
 
   # Build & sign Ubuntu package
   ubuntu_build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs: prereqs
     steps:
       - name: Install git dependencies
