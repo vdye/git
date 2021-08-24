@@ -13,6 +13,8 @@
 #include "help.h"
 #include "archive.h"
 #include "object-store.h"
+#include "simple-ipc.h"
+#include "fsmonitor-ipc.h"
 
 /*
  * Remove the deepest subdirectory in the provided path string. Path must not
@@ -53,6 +55,9 @@ static void setup_enlistment_directory(int argc, const char **argv,
 		die(_("need a working directory"));
 
 	strbuf_trim_trailing_dir_sep(&path);
+#ifdef GIT_WINDOWS_NATIVE
+	convert_slashes(path.buf);
+#endif
 	do {
 		const size_t len = path.len;
 
@@ -96,12 +101,14 @@ static void setup_enlistment_directory(int argc, const char **argv,
 	setup_git_directory();
 }
 
+static int git_retries = 3;
+
 static int run_git(const char *arg, ...)
 {
 	struct strvec argv = STRVEC_INIT;
 	va_list args;
 	const char *p;
-	int res;
+	int res, attempts;
 
 	va_start(args, arg);
 	strvec_push(&argv, arg);
@@ -109,7 +116,10 @@ static int run_git(const char *arg, ...)
 		strvec_push(&argv, p);
 	va_end(args);
 
-	res = run_command_v_opt(argv.v, RUN_GIT_CMD);
+	for (attempts = 0, res = 1;
+	     res && attempts < git_retries;
+	     attempts++)
+		res = run_command_v_opt(argv.v, RUN_GIT_CMD);
 
 	strvec_clear(&argv);
 	return res;
@@ -169,6 +179,13 @@ static int set_recommended_config(int reconfigure)
 		{ "core.autoCRLF", "false" },
 		{ "core.safeCRLF", "false" },
 		{ "fetch.showForcedUpdates", "false" },
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+		/*
+		 * Enable the built-in FSMonitor on supported platforms.
+		 */
+		{ "core.fsmonitor", "true" },
+#endif
+		{ "core.configWriteLockTimeoutMS", "150" },
 		{ NULL, NULL },
 	};
 	int i;
@@ -211,15 +228,24 @@ static int set_recommended_config(int reconfigure)
 
 static int toggle_maintenance(int enable)
 {
+	unsigned long ul;
+
+	if (git_config_get_ulong("core.configWriteLockTimeoutMS", &ul))
+		git_config_push_parameter("core.configWriteLockTimeoutMS=150");
+
 	return run_git("maintenance", enable ? "start" : "unregister", NULL);
 }
 
 static int add_or_remove_enlistment(int add)
 {
 	int res;
+	unsigned long ul;
 
 	if (!the_repository->worktree)
 		die(_("Scalar enlistments require a worktree"));
+
+	if (git_config_get_ulong("core.configWriteLockTimeoutMS", &ul))
+		git_config_push_parameter("core.configWriteLockTimeoutMS=150");
 
 	res = run_git("config", "--global", "--get", "--fixed-value",
 		      "scalar.repo", the_repository->worktree, NULL);
@@ -236,6 +262,56 @@ static int add_or_remove_enlistment(int add)
 		       "scalar.repo", the_repository->worktree, NULL);
 }
 
+static int start_fsmonitor_daemon(void)
+{
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+	struct strbuf err = STRBUF_INIT;
+	struct child_process cp = CHILD_PROCESS_INIT;
+
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "fsmonitor--daemon", "start", NULL);
+	if (!pipe_command(&cp, NULL, 0, NULL, 0, &err, 0)) {
+		strbuf_release(&err);
+		return 0;
+	}
+
+	if (fsmonitor_ipc__get_state() != IPC_STATE__LISTENING) {
+		write_in_full(2, err.buf, err.len);
+		strbuf_release(&err);
+		return error(_("could not start the FSMonitor daemon"));
+	}
+
+	strbuf_release(&err);
+#endif
+
+	return 0;
+}
+
+static int stop_fsmonitor_daemon(void)
+{
+#ifdef HAVE_FSMONITOR_DAEMON_BACKEND
+	struct strbuf err = STRBUF_INIT;
+	struct child_process cp = CHILD_PROCESS_INIT;
+
+	cp.git_cmd = 1;
+	strvec_pushl(&cp.args, "fsmonitor--daemon", "stop", NULL);
+	if (!pipe_command(&cp, NULL, 0, NULL, 0, &err, 0)) {
+		strbuf_release(&err);
+		return 0;
+	}
+
+	if (fsmonitor_ipc__get_state() == IPC_STATE__LISTENING) {
+		write_in_full(2, err.buf, err.len);
+		strbuf_release(&err);
+		return error(_("could not stop the FSMonitor daemon"));
+	}
+
+	strbuf_release(&err);
+#endif
+
+	return 0;
+}
+
 static int register_dir(void)
 {
 	int res = add_or_remove_enlistment(1);
@@ -245,6 +321,9 @@ static int register_dir(void)
 
 	if (!res)
 		res = toggle_maintenance(1);
+
+	if (!res)
+		res = start_fsmonitor_daemon();
 
 	return res;
 }
@@ -257,6 +336,9 @@ static int unregister_dir(void)
 		res = -1;
 
 	if (add_or_remove_enlistment(0) < 0)
+		res = -1;
+
+	if (stop_fsmonitor_daemon() < 0)
 		res = -1;
 
 	return res;
@@ -1046,6 +1128,25 @@ static int cmd_delete(int argc, const char **argv)
 	return res;
 }
 
+static int cmd_help(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END(),
+	};
+	const char * const usage[] = {
+		N_("scalar help"),
+		NULL
+	};
+
+	argc = parse_options(argc, argv, NULL, options,
+			     usage, 0);
+
+	if (argc != 0)
+		usage_with_options(usage, options);
+
+	return run_git("help", "scalar", NULL);
+}
+
 static int cmd_version(int argc, const char **argv)
 {
 	int verbose = 0, build_options = 0;
@@ -1085,6 +1186,7 @@ static struct {
 	{ "run", cmd_run },
 	{ "reconfigure", cmd_reconfigure },
 	{ "delete", cmd_delete },
+	{ "help", cmd_help },
 	{ "version", cmd_version },
 	{ "diagnose", cmd_diagnose },
 	{ NULL, NULL},
@@ -1117,6 +1219,9 @@ int cmd_main(int argc, const char **argv)
 	if (argc > 1) {
 		argv++;
 		argc--;
+
+		if (!strcmp(argv[0], "config"))
+			argv[0] = "reconfigure";
 
 		for (i = 0; builtins[i].name; i++)
 			if (!strcmp(builtins[i].name, argv[0]))

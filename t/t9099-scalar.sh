@@ -2,19 +2,24 @@
 
 test_description='test the `scalar` command'
 
-TEST_DIRECTORY=$PWD/../../../t
-export TEST_DIRECTORY
-
-# Make it work with --no-bin-wrappers
-PATH=$PWD/..:$PATH
-
-. ../../../t/test-lib.sh
+. ./test-lib.sh
 
 GIT_TEST_MAINT_SCHEDULER="crontab:test-tool crontab ../cron.txt,launchctl:true,schtasks:true"
 export GIT_TEST_MAINT_SCHEDULER
 
+test_lazy_prereq BUILTIN_FSMONITOR '
+	git version --build-options | grep -q "feature:.*fsmonitor--daemon"
+'
+
 test_expect_success 'scalar shows a usage' '
 	test_expect_code 129 scalar -h
+'
+
+test_expect_success BUILTIN_FSMONITOR 'scalar register starts fsmon daemon' '
+	git init test/src &&
+	test_must_fail git -C test/src fsmonitor--daemon status &&
+	scalar register test/src &&
+	git -C test/src fsmonitor--daemon status
 '
 
 test_expect_success 'scalar unregister' '
