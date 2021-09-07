@@ -276,7 +276,7 @@ void expand_to_pattern_list(struct index_state *istate,
 	 * If the index is already full, then keep it full. We will convert
 	 * it to a sparse index on write, if possible.
 	 */
-	if (!istate || !istate->sparse_index)
+	if (!istate || istate->sparse_index == COMPLETELY_FULL)
 		return;
 
 	/*
