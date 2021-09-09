@@ -114,5 +114,6 @@ test_perf_on_all git reset
 test_perf_on_all git reset --hard
 test_perf_on_all git reset -- does-not-exist
 test_perf_on_all git checkout-index -f --all
+test_perf_on_all git update-index --add --remove
 
 test_done
