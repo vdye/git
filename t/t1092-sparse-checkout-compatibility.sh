@@ -390,11 +390,15 @@ test_expect_success 'diff --staged' '
 test_expect_success 'diff partially-staged' '
 	init_repos &&
 
+	write_script edit-contents <<-\EOF &&
+	echo text >>$1
+	EOF
+
 	# Add file within cone
 	test_all_match git sparse-checkout set deep &&
-	run_on_all 'echo >deep/testfile' &&
+	run_on_all ../edit-contents deep/testfile &&
 	test_all_match git add deep/testfile &&
-	run_on_all 'echo a new line >>deep/testfile' &&
+	run_on_all ../edit-contents deep/testfile &&
 
 	test_all_match git diff &&
 	test_all_match git diff --staged &&
@@ -402,10 +406,10 @@ test_expect_success 'diff partially-staged' '
 	# Add file outside cone
 	test_all_match git reset --hard &&
 	run_on_all mkdir newdirectory &&
-	run_on_all 'echo >newdirectory/testfile' &&
+	run_on_all ../edit-contents newdirectory/testfile &&
 	test_all_match git sparse-checkout set newdirectory &&
 	test_all_match git add newdirectory/testfile &&
-	run_on_all 'echo a new line >>newdirectory/testfile' &&
+	run_on_all ../edit-contents newdirectory/testfile &&
 	test_all_match git sparse-checkout set &&
 
 	test_all_match git diff &&
