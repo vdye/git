@@ -1748,6 +1748,36 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 		setup_standard_excludes(o->dir);
 	}
 
+	/*
+	 * If the prefix is equal to or contained within a sparse directory, the
+	 * index needs to be expanded to traverse with the specified prefix.
+	 */
+	if (o->prefix && o->src_index->sparse_index) {
+		int prefix_len = strlen(o->prefix);
+
+		while (prefix_len > 0 && o->prefix[prefix_len - 1] == '/')
+			prefix_len--;
+
+		if (prefix_len > 0) {
+			struct strbuf ce_prefix = STRBUF_INIT;
+			strbuf_grow(&ce_prefix, prefix_len + 1);
+			strbuf_add(&ce_prefix, o->prefix, prefix_len);
+			strbuf_addch(&ce_prefix, '/');
+
+			/*
+			 * If the prefix is not inside the sparse cone, then the
+			 * index is explicitly expanded if it is found as a sparse
+			 * directory, or implicitly expanded (by 'index_name_pos')
+			 * if the path is inside a sparse directory.
+			 */
+		    	if (!path_in_cone_mode_sparse_checkout(ce_prefix.buf, o->src_index) &&
+			    index_name_pos(o->src_index, ce_prefix.buf, ce_prefix.len) >= 0)
+				ensure_full_index(o->src_index);
+
+			strbuf_release(&ce_prefix);
+		}
+	}
+
 	if (!core_apply_sparse_checkout || !o->update)
 		o->skip_sparse_checkout = 1;
 	if (!o->skip_sparse_checkout && !o->pl) {
