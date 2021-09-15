@@ -800,6 +800,17 @@ out:
 	return ret;
 }
 
+static void prime_cache_tree_sparse_dir(struct repository *r,
+				 struct cache_tree *it,
+				 struct tree *tree,
+				 struct strbuf *tree_path)
+{
+
+	oidcpy(&it->oid, &tree->object.oid);
+	it->entry_count = 1;
+	return;
+}
+
 static void prime_cache_tree_rec(struct repository *r,
 				 struct cache_tree *it,
 				 struct tree *tree,
@@ -811,21 +822,6 @@ static void prime_cache_tree_rec(struct repository *r,
 	int cnt;
 
 	oidcpy(&it->oid, &tree->object.oid);
-
-	/*
-	 * If this entry is outside the sparse-checkout cone, then it might be
-	 * a sparse directory entry. Check the index to ensure it is by looking
-	 * for an entry with the exact same name as the tree. If no matching sparse
-	 * entry is found, a staged or conflicted entry is preventing this
-	 * directory from collapsing to a sparse directory entry, so the cache
-	 * tree expansion should continue.
-	 */
-	if (r->index->sparse_index &&
-	    !path_in_cone_modesparse_checkout(tree_path->buf, r->index) &&
-	    index_name_pos(r->index, tree_path->buf, tree_path->len) >= 0) {
-		it->entry_count = 1;
-		return;
-	}
 
 	init_tree_desc(&desc, tree->buffer, tree->size);
 	cnt = 0;
@@ -846,7 +842,18 @@ static void prime_cache_tree_rec(struct repository *r,
 			strbuf_add(&subtree_path, entry.path, entry.pathlen);
 			strbuf_addch(&subtree_path, '/');
 
-			prime_cache_tree_rec(r, sub->cache_tree, subtree, &subtree_path);
+			/*
+			* If a sparse index is in use, the directory being processed may be
+			* sparse. To confirm that, we can check whether an entry with that
+			* exact name exists in the index. If it does, the created subtree
+			* should be sparse. Otherwise, cache tree expansion should continue
+			* as normal.
+			*/
+			if (r->index->sparse_index &&
+			    index_entry_exists(r->index, subtree_path.buf, subtree_path.len))
+				prime_cache_tree_sparse_dir(r, sub->cache_tree, subtree, &subtree_path);
+			else
+				prime_cache_tree_rec(r, sub->cache_tree, subtree, &subtree_path);
 			cnt += sub->cache_tree->entry_count;
 		}
 	}
