@@ -1050,7 +1050,7 @@ test_expect_success 'sparse-index is not expanded' '
 	do
 		echo >>sparse-index/README.md &&
 		ensure_not_expanded reset --mixed $ref
-		ensure_not_expanded reset --hard $ref
+		ensure_not_expanded reset --hard $ref || return 1
 	done &&
 
 	ensure_not_expanded reset --hard update-deep &&
