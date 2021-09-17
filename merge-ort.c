@@ -4527,6 +4527,15 @@ redo:
 	result->tree = parse_tree_indirect(&working_tree_oid);
 	/* existence of conflicted entries implies unclean */
 	result->clean &= strmap_empty(&opt->priv->conflicted);
+	if (!strmap_empty(&opt->priv->conflicted))
+	{
+		struct hashmap_iter iter;
+		struct strmap_entry *e;
+		strmap_for_each_entry(&opt->priv->conflicted, &iter, e) {
+			result->first_conflicted = e->key;
+			break;
+		}
+	}
 	if (!opt->priv->call_depth) {
 		result->priv = opt->priv;
 		result->_properly_initialized = RESULT_INITIALIZED;

@@ -24,6 +24,11 @@ struct merge_result {
 	struct tree *tree;
 
 	/*
+	 * The first entry found with a conflict, intended for use in reporting.
+	 */
+	const char *first_conflicted;
+
+	/*
 	 * Additional metadata used by merge_switch_to_result() or future calls
 	 * to merge_incore_*().  Includes data needed to update the index (if
 	 * !clean) and to print "CONFLICT" messages.  Not for external use.
