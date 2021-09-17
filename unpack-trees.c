@@ -5,6 +5,7 @@
 #include "repository.h"
 #include "config.h"
 #include "dir.h"
+#include "merge-ort.h"
 #include "tree.h"
 #include "tree-walk.h"
 #include "cache-tree.h"
@@ -2053,6 +2054,12 @@ static int reject_merge(const struct cache_entry *ce,
 	return add_rejected_path(o, ERROR_WOULD_OVERWRITE, ce->name);
 }
 
+static int reject_merge_by_path(const char *path,
+				struct unpack_trees_options *o)
+{
+	return add_rejected_path(o, ERROR_WOULD_OVERWRITE, path);
+}
+
 static int same(const struct cache_entry *a, const struct cache_entry *b)
 {
 	if (!!a != !!b)
@@ -2512,6 +2519,55 @@ static void show_stage_entry(FILE *o,
 }
 #endif
 
+static int merge_sparse_dirs(const struct cache_entry *base,
+		      const struct cache_entry *left,
+		      const struct cache_entry *right,
+		      struct unpack_trees_options *o)
+{
+	const struct object_id *empty_tree_oid;
+	struct merge_options opt;
+	struct cache_entry *merge;
+	struct tree *base_tree, *left_tree, *right_tree;
+	struct merge_result result;
+	struct strbuf conflict_path = STRBUF_INIT;
+	int ret;
+
+	assert(left != NULL);
+
+	init_merge_options(&opt, o->src_index->repo);
+	opt.ancestor = "base";
+	opt.branch1 = "left";
+	opt.branch2 = "right";
+	memset(&result, 0, sizeof(result));
+
+	empty_tree_oid = o->src_index->repo->hash_algo->empty_tree;
+	base_tree = lookup_tree(o->src_index->repo, base ? &base->oid : empty_tree_oid);
+	left_tree = lookup_tree(o->src_index->repo, &left->oid);
+	right_tree = lookup_tree(o->src_index->repo, right ? &right->oid : empty_tree_oid);
+
+	merge_incore_nonrecursive(&opt, base_tree, left_tree, right_tree, &result);
+
+	if (result.clean) {
+		merge = dup_cache_entry(left, o->src_index);
+		oidcpy(&merge->oid, &result.tree->object.oid);
+		ret = merged_entry(merge, left, o);
+	}
+	else {
+		/*
+		 * Find the first conflicted entry, reject the merge for that.
+		 */
+		int conflict_path_len = strlen(result.first_conflicted);
+
+		strbuf_grow(&conflict_path, ce_namelen(base) + conflict_path_len);
+		strbuf_add(&conflict_path, base->name, ce_namelen(base));
+		strbuf_add(&conflict_path, result.first_conflicted, conflict_path_len);
+		ret = reject_merge_by_path(conflict_path.buf, o);
+	}
+
+	strbuf_release(&conflict_path);
+	return ret;
+}
+
 int threeway_merge(const struct cache_entry * const *stages,
 		   struct unpack_trees_options *o)
 {
@@ -2737,8 +2793,20 @@ int twoway_merge(const struct cache_entry * const *src,
 			 * reject the merge instead.
 			 */
 			return merged_entry(newtree, current, o);
-		} else
+		} else {
+			/*
+			 * At this point, current, oldtree, and newtree are guaranteed to
+			 * exist. If a sparse directory is being merged, then the apparent
+			 * "differences" between these three object may be due to different
+			 * files being edited within the sparse directory. Therefore, we
+			 * want to perform a tree merge of these entries.
+			 */
+			if (S_ISSPARSEDIR(current->ce_mode) &&
+			    (!oldtree || S_ISSPARSEDIR(oldtree->ce_mode)) &&
+			    (!newtree || S_ISSPARSEDIR(newtree->ce_mode)))
+				return merge_sparse_dirs(oldtree, current, newtree, o);
 			return reject_merge(current, o);
+		}
 	}
 	else if (newtree) {
 		if (oldtree && !o->initial_checkout) {

@@ -1254,7 +1254,8 @@ test_expect_success 'sparse index is not expanded: read-tree' '
 	init_repos &&
 
 	ensure_not_expanded checkout -b test-branch update-folder1 &&
-	for MERGE_TREES in "update-folder2"
+	for MERGE_TREES in "update-folder1 update-folder2" \
+		      "update-folder2"
 	do
 		ensure_not_expanded read-tree -mu $MERGE_TREES &&
 		ensure_not_expanded reset --hard HEAD || return 1
