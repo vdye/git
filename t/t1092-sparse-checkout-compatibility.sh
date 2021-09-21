@@ -621,7 +621,7 @@ test_expect_success 'reset with wildcard pathspec' '
 
 	test_all_match git checkout -b reset-test update-deep &&
 	test_all_match git reset --hard update-folder1 &&
-	test_all_match git reset base -- */a &&
+	test_all_match git reset base -- \*/a &&
 	test_all_match git status --porcelain=v2
 '
 
