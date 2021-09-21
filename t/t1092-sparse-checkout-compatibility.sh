@@ -621,7 +621,7 @@ test_expect_success 'reset with wildcard pathspec' '
 
 	test_all_match git checkout -b reset-test update-deep &&
 	test_all_match git reset --hard update-folder1 &&
-	test_all_match git reset base -- */a &&
+	test_all_match git reset base -- \*/a &&
 	test_all_match git status --porcelain=v2
 '
 
@@ -1158,6 +1158,19 @@ test_expect_success 'sparse-index is not expanded' '
 	ensure_not_expanded add extra.txt &&
 	echo >>sparse-index/untracked.txt &&
 	ensure_not_expanded add . &&
+
+	echo >>sparse-index/a &&
+	ensure_not_expanded stash &&
+	ensure_not_expanded stash list &&
+	ensure_not_expanded stash show stash@{0} &&
+	ensure_not_expanded stash apply stash@{0} &&
+	ensure_not_expanded stash drop stash@{0} &&
+
+	ensure_not_expanded stash create &&
+	oid=$(git -C sparse-index stash create) &&
+	ensure_not_expanded stash store -m "test" $oid &&
+	ensure_not_expanded reset --hard &&
+	ensure_not_expanded stash pop &&
 
 	ensure_not_expanded checkout-index -f a &&
 	ensure_not_expanded checkout-index -f --all &&
