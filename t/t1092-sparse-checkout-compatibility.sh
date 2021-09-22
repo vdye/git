@@ -1279,6 +1279,9 @@ test_expect_success 'sparse-index is not expanded' '
 	ensure_not_expanded stash apply stash@{0} &&
 	ensure_not_expanded stash drop stash@{0} &&
 
+	ensure_not_expanded stash -u &&
+	ensure_not_expanded stash pop &&
+
 	ensure_not_expanded stash create &&
 	oid=$(git -C sparse-index stash create) &&
 	ensure_not_expanded stash store -m "test" $oid &&
@@ -1449,6 +1452,24 @@ test_expect_success 'sparse index is not expanded: read-tree' '
 	ensure_not_expanded commit -m "test" &&
 
 	ensure_not_expanded read-tree --prefix=deep/deeper2 -u deepest
+'
+
+# NEEDSWORK: similar to `git add`, untracked files outside of the sparse
+# checkout definition are successfully stashed and unstashed.
+test_expect_success 'stash -u outside sparse checkout definition' '
+	init_repos &&
+
+	write_script edit-contents <<-\EOF &&
+	echo text >>$1
+	EOF
+
+	run_on_sparse mkdir -p folder1 &&
+	run_on_all ../edit-contents folder1/new &&
+	test_all_match git stash -u &&
+	test_all_match git status --porcelain=v2 &&
+
+	test_all_match git stash pop -q &&
+	test_all_match git status --porcelain=v2
 '
 
 test_expect_success 'ls-files' '
