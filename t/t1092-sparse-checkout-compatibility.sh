@@ -1173,7 +1173,6 @@ test_expect_success 'sparse-index is not expanded' '
 	for ref in update-deep update-folder1 update-folder2 update-deep
 	do
 		echo >>sparse-index/README.md &&
-		ensure_not_expanded reset --mixed $ref
 		ensure_not_expanded reset --hard $ref || return 1
 	done &&
 
