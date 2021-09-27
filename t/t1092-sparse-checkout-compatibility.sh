@@ -570,7 +570,7 @@ test_expect_success 'reset with sparse directory pathspec outside definition' '
 	test_all_match git status --porcelain=v2
 '
 
-test_expect_success 'reset with file pathspec outside sparse definition' '
+test_expect_success 'reset with pathspec match in sparse directory' '
 	init_repos &&
 
 	test_all_match git checkout -b reset-test update-deep &&
@@ -803,14 +803,25 @@ test_expect_success 'sparse-index is not expanded' '
 	for ref in update-deep update-folder1 update-folder2 update-deep
 	do
 		echo >>sparse-index/README.md &&
+		ensure_not_expanded reset --mixed $ref
 		ensure_not_expanded reset --hard $ref || return 1
 	done &&
 
 	ensure_not_expanded reset --hard update-deep &&
 	ensure_not_expanded reset --keep base &&
 	ensure_not_expanded reset --merge update-deep &&
-	ensure_not_expanded reset --hard &&
 
+	ensure_not_expanded reset base -- deep/a &&
+	ensure_not_expanded reset base -- nonexistent-file &&
+	ensure_not_expanded reset deepest -- deep &&
+
+	# Although folder1 is outside the sparse definition, it exists as a
+	# directory entry in the index, so it will be reset without needing to
+	# expand the full index.
+	ensure_not_expanded reset --hard update-folder1 &&
+	ensure_not_expanded reset base -- folder1 &&
+
+	ensure_not_expanded reset --hard update-deep &&
 	ensure_not_expanded checkout -f update-deep &&
 	test_config -C sparse-index pull.twohead ort &&
 	(
