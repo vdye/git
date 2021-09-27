@@ -151,7 +151,9 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		 * If the file 1) corresponds to an existing index entry with
 		 * skip-worktree set, or 2) does not exist in the index but is
 		 * outside the sparse checkout definition, add a skip-worktree bit
-		 * to the new index entry.
+		 * to the new index entry. Note that a sparse index will be expanded
+		 * if this entry is outside the sparse cone - this is necessary
+		 * to properly construct the reset sparse directory.
 		 */
 		pos = cache_name_pos(one->path, strlen(one->path));
 		if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) ||
@@ -169,13 +171,78 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 	}
 }
 
+static int pathspec_needs_expanded_index(const struct pathspec *pathspec)
+{
+	unsigned int i, pos;
+	int res = 0;
+	char *skip_worktree_seen = NULL;
+
+	/*
+	 * When using a magic pathspec, assume for the sake of simplicity that
+	 * the index needs to be expanded to match all matchable files.
+	 */
+	if (pathspec->magic)
+		return 1;
+
+	for (i = 0; i < pathspec->nr; i++) {
+		struct pathspec_item item = pathspec->items[i];
+
+		/*
+		 * If the pathspec item has a wildcard, the index should be expanded
+		 * if the pathspec has the possibility of matching a subset of entries inside
+		 * of a sparse directory (but not the entire directory).
+		 *
+		 * If the pathspec item is a literal path, the index only needs to be expanded
+		 * if a) the pathspec isn't in the sparse checkout cone (to make sure we don't
+		 * expand for in-cone files) and b) it doesn't match any sparse directories
+		 * (since we can reset whole sparse directories without expanding them).
+		 */
+		if (item.nowildcard_len < item.len) {
+			for (pos = 0; pos < active_nr; pos++) {
+				struct cache_entry *ce = active_cache[pos];
+
+				if (!S_ISSPARSEDIR(ce->ce_mode))
+					continue;
+
+				/*
+				 * If the pre-wildcard length is longer than the sparse
+				 * directory name and the sparse directory is the first
+				 * component of the pathspec, need to expand the index.
+				 */
+				if (item.nowildcard_len > ce_namelen(ce) &&
+				    !strncmp(item.original, ce->name, ce_namelen(ce))) {
+					res = 1;
+					break;
+				}
+
+				/*
+				 * If the pre-wildcard length is shorter than the sparse
+				 * directory and the pathspec does not match the whole
+				 * directory, need to expand the index.
+				 */
+				if (!strncmp(item.original, ce->name, item.nowildcard_len) &&
+				    wildmatch(item.original, ce->name, 0)) {
+					res = 1;
+					break;
+				}
+			}
+		} else if (!path_in_cone_modesparse_checkout(item.original, &the_index) &&
+			   !matches_skip_worktree(pathspec, i, &skip_worktree_seen))
+			res = 1;
+
+		if (res > 0)
+			break;
+	}
+
+	free(skip_worktree_seen);
+	return res;
+}
+
 static int read_from_tree(const struct pathspec *pathspec,
 			  struct object_id *tree_oid,
 			  int intent_to_add)
 {
 	struct diff_options opt;
-	unsigned int i;
-	char *skip_worktree_seen = NULL;
 
 	memset(&opt, 0, sizeof(opt));
 	copy_pathspec(&opt.pathspec, pathspec);
@@ -188,29 +255,8 @@ static int read_from_tree(const struct pathspec *pathspec,
 	opt.change = diff_change;
 	opt.add_remove = diff_addremove;
 
-	/*
-	 * When pathspec is given for resetting a cone-mode sparse checkout, it may
-	 * identify entries that are nested in sparse directories, in which case the
-	 * index should be expanded. For the sake of efficiency, this check is
-	 * overly-cautious: anything with a wildcard or a magic prefix requires
-	 * expansion, as well as literal paths that aren't in the sparse checkout
-	 * definition AND don't match any directory in the index.
-	 */
-	if (pathspec->nr && the_index.sparse_index) {
-		if (pathspec->magic || pathspec->has_wildcard) {
-			ensure_full_index(&the_index);
-		} else {
-			for (i = 0; i < pathspec->nr; i++) {
-				if (!path_in_cone_modesparse_checkout(pathspec->items[i].original, &the_index) &&
-					!matches_skip_worktree(pathspec, i, &skip_worktree_seen)) {
-					ensure_full_index(&the_index);
-					break;
-				}
-			}
-		}
-	}
-
-	free(skip_worktree_seen);
+	if (pathspec->nr && the_index.sparse_index && pathspec_needs_expanded_index(pathspec))
+		ensure_full_index(&the_index);
 
 	if (do_diff_cache(tree_oid, &opt))
 		return 1;
