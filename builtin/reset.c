@@ -196,6 +196,8 @@ static int read_from_tree(const struct pathspec *pathspec,
 			  int intent_to_add)
 {
 	struct diff_options opt;
+	unsigned int i;
+	char *skip_worktree_seen = NULL;
 
 	memset(&opt, 0, sizeof(opt));
 	copy_pathspec(&opt.pathspec, pathspec);
@@ -203,9 +205,35 @@ static int read_from_tree(const struct pathspec *pathspec,
 	opt.format_callback = update_index_from_diff;
 	opt.format_callback_data = &intent_to_add;
 	opt.flags.override_submodule_config = 1;
+	opt.flags.recursive = 1;
 	opt.repo = the_repository;
+	opt.change = diff_change;
+	opt.add_remove = diff_addremove;
 
-	ensure_full_index(&the_index);
+	/*
+	 * When pathspec is given for resetting a cone-mode sparse checkout, it may
+	 * identify entries that are nested in sparse directories, in which case the
+	 * index should be expanded. For the sake of efficiency, this check is
+	 * overly-cautious: anything with a wildcard or a magic prefix requires
+	 * expansion, as well as literal paths that aren't in the sparse checkout
+	 * definition AND don't match any directory in the index.
+	 */
+	if (pathspec->nr && the_index.sparse_index) {
+		if (pathspec->magic || pathspec->has_wildcard) {
+			ensure_full_index(&the_index);
+		} else {
+			for (i = 0; i < pathspec->nr; i++) {
+				if (!path_in_cone_mode_sparse_checkout(pathspec->items[i].original, &the_index) &&
+				    !matches_skip_worktree(pathspec, i, &skip_worktree_seen)) {
+					ensure_full_index(&the_index);
+					break;
+				}
+			}
+		}
+	}
+
+	free(skip_worktree_seen);
+
 	if (do_diff_cache(tree_oid, &opt))
 		return 1;
 	diffcore_std(&opt);
