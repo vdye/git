@@ -101,14 +101,15 @@ git version
 scalar version
 ```
 
-To upgrade microsoft/git, you can run the necessary `brew` commands:
+To upgrade `microsoft/git`, you can run the necessary `brew` commands:
 
 ```shell
 brew update
 brew upgrade --cask microsoft-git
 ```
 
-Or you can run the `git update-microsoft-git` command, which will run those brew commands for you.
+Or you can run the `git update-microsoft-git` command, which will run those
+`brew` commands for you.
 
 ## Linux
 
@@ -125,6 +126,16 @@ sudo apt-get update
 sudo apt-get install microsoft-git
 ```
 
+To upgrade `microsoft/git`, you can run the necessary `apt-get` commands:
+
+```shell
+sudo apt-get update
+sudo apt-get upgrade microsoft-git
+```
+
+Or you can run the `git update-microsoft-git` command, which will run those
+`apt-get` commands for you.
+
 ### Ubuntu 21.04 (Hirsute)
 
 ```shell
@@ -133,6 +144,16 @@ curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/
 sudo apt-get update
 sudo apt-get install microsoft-git
 ```
+
+To upgrade `microsoft/git`, you can run the necessary `apt-get` commands:
+
+```shell
+sudo apt-get update
+sudo apt-get upgrade microsoft-git
+```
+
+Or you can run the `git update-microsoft-git` command, which will run those
+`apt-get` commands for you.
 
 ### Other Ubuntu/Debian distributions
 
@@ -152,7 +173,11 @@ which should have the same output:
 git version
 scalar version
 ```
+
+To upgrade, you will need to repeat these steps to reinstall.
+
 ### Non-Ubuntu/Debian distributions
+
 You will need to compile and install `microsoft/git` from source:
 
 ```shell
