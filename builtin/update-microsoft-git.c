@@ -56,8 +56,26 @@ static int platform_specific_upgrade(void)
 #else
 static int platform_specific_upgrade(void)
 {
-	error(_("update-microsoft-git is not supported on this platform"));
-	return 1;
+	int res;
+	struct strvec args = STRVEC_INIT;
+
+	printf("Updating apt-get with 'sudo apt-get update'\n\n");
+
+	strvec_pushl(&args, "sudo", "apt-get", "update", NULL);
+	res = run_command_v_opt(args.v, 0);
+	strvec_clear(&args);
+
+	if (res) {
+		error(_("'sudo apt-get update' failed; is apt-get installed?"));
+		return 1;
+	}
+
+	printf("\nUpgrading microsoft-git with 'sudo apt-get upgrade microsoft-git'\n\n");
+	strvec_pushl(&args, "sudo", "apt-get", "upgrade", "microsoft-git", NULL);
+	res = run_command_v_opt(args.v, 0);
+	strvec_clear(&args);
+
+	return res;
 }
 #endif
 
