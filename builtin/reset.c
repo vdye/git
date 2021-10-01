@@ -129,51 +129,30 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		struct diff_options *opt, void *data)
 {
 	int i;
-	int pos;
 	int intent_to_add = *(int *)data;
 
 	for (i = 0; i < q->nr; i++) {
+		int pos;
 		struct diff_filespec *one = q->queue[i]->one;
 		struct diff_filespec *two = q->queue[i]->two;
-		int is_missing = !(one->mode && !is_null_oid(&one->oid));
-		int was_missing = !two->mode && is_null_oid(&two->oid);
+		int is_in_reset_tree = one->mode && !is_null_oid(&one->oid);
 		struct cache_entry *ce;
-		struct cache_entry *ce_before;
-		struct checkout state = CHECKOUT_INIT;
 
 		/*
-		 * When using the sparse-checkout feature the cache entries
-		 * that are added here will not have the skip-worktree bit
-		 * set. Without this code there is data that is lost because
-		 * the files that would normally be in the working directory
-		 * are not there and show as deleted for the next status.
-		 * In the case of added files, they just disappear.
-		 *
-		 * We need to create the previous version of the files in
-		 * the working directory so that they will have the right
-		 * content and the next status call will show modified or
-		 * untracked files correctly.
+		 * If the file being reset has `skip-worktree` enabled, we need
+		 * to check it out to prevent the file from being hard reset.
 		 */
-		if (core_apply_sparse_checkout && !file_exists(two->path)) {
-			pos = cache_name_pos(two->path, strlen(two->path));
-			if ((pos >= 0 && ce_skip_worktree(active_cache[pos])) &&
-			    (is_missing || !was_missing)) {
-				state.force = 1;
-				state.refresh_cache = 1;
-				state.istate = &the_index;
+		pos = cache_name_pos(two->path, strlen(two->path));
+		if (pos >= 0 && ce_skip_worktree(active_cache[pos])) {
+			struct checkout state = CHECKOUT_INIT;
+			state.force = 1;
+			state.refresh_cache = 1;
+			state.istate = &the_index;
 
-				ce_before = make_cache_entry(&the_index, two->mode,
-							     &two->oid, two->path,
-							     0, 0);
-				if (!ce_before)
-					die(_("make_cache_entry failed for path '%s'"),
-						two->path);
-
-				checkout_entry(ce_before, &state, NULL, NULL);
-			}
+			checkout_entry(active_cache[pos], &state, NULL, NULL);
 		}
 
-		if (is_missing && !intent_to_add) {
+		if (!is_in_reset_tree && !intent_to_add) {
 			remove_file_from_cache(one->path);
 			continue;
 		}
@@ -183,7 +162,7 @@ static void update_index_from_diff(struct diff_queue_struct *q,
 		if (!ce)
 			die(_("make_cache_entry failed for path '%s'"),
 			    one->path);
-		if (is_missing) {
+		if (!is_in_reset_tree) {
 			ce->ce_flags |= CE_INTENT_TO_ADD;
 			set_object_name_for_intent_to_add_entry(ce);
 		}
