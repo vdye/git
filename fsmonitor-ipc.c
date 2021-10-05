@@ -1,5 +1,4 @@
 #include "cache.h"
-#include "config.h"
 #include "fsmonitor.h"
 #include "simple-ipc.h"
 #include "fsmonitor-ipc.h"
@@ -11,8 +10,6 @@
 
 int fsmonitor_ipc__is_supported(void)
 {
-	if (git_config_get_virtualfilesystem())
-		return 0;
 	return 1;
 }
 
@@ -69,9 +66,6 @@ try_again:
 		goto done;
 
 	case IPC_STATE__NOT_LISTENING:
-		ret = error(_("fsmonitor_ipc__send_query: daemon not available"));
-		goto done;
-
 	case IPC_STATE__PATH_NOT_FOUND:
 		if (tried_to_spawn)
 			goto done;
