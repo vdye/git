@@ -127,9 +127,6 @@ static void lookup_fsmonitor_settings(struct repository *r)
 
 enum fsmonitor_mode fsm_settings__get_mode(struct repository *r)
 {
-	if (git_config_get_virtualfilesystem())
-		return FSMONITOR_MODE_INCOMPATIBLE;
-
 	if (!r->settings.fsmonitor)
 		lookup_fsmonitor_settings(r);
 
