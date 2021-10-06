@@ -190,10 +190,10 @@ jobs:
           b=/usr/src/build-extra &&
 
           filename=$b/git-update-git-for-windows.config
-          tr % '\t' >$filename <<-\EOF
+          tr % '\t' >$filename <<-\EOF &&
           [update]
           %fromFork = microsoft/git
-          EOF &&
+          EOF
 
           sed -i -e '/^#include "file-list.iss"/a\
           Source: {#SourcePath}\\..\\'$filename'; DestDir: {app}\\mingw64\\bin; Flags: replacesameversion; AfterInstall: DeleteFromVirtualStore' \
