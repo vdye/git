@@ -196,7 +196,7 @@ jobs:
           EOF
 
           sed -i -e '/^#include "file-list.iss"/a\
-          Source: {#SourcePath}\\..\\'$filename'; DestDir: {app}\\mingw64\\bin; Flags: replacesameversion; AfterInstall: DeleteFromVirtualStore' \
+          Source: {#SourcePath}\\..\\git-update-git-for-windows.config; DestDir: {app}\\mingw64\\bin; Flags: replacesameversion; AfterInstall: DeleteFromVirtualStore' \
             -e '/^Type: dirifempty; Name: {app}\\{#MINGW_BITNESS}$/i\
           Type: files; Name: {app}\\{#MINGW_BITNESS}\\bin\\git-update-git-for-windows.config\
           Type: dirifempty; Name: {app}\\{#MINGW_BITNESS}\\bin' \
