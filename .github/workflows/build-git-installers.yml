@@ -313,7 +313,7 @@ jobs:
       # Enable a bit stricter compile flags
       DEVELOPER: 1
       # For the osx-installer build
-      OSX_VERSION: 10.6
+      OSX_VERSION: 10.15
       V: 1
     steps:
       - name: Install git dependencies
@@ -370,13 +370,13 @@ jobs:
 
           PATH=/usr/local/bin:/System/Library/Frameworks:$PATH \
           make -C git_osx_installer \
-              OSX_VERSION=10.6 C_INCLUDE_PATH="$C_INCLUDE_PATH" V=1 \
-              build/intel-universal-snow-leopard/git-$VERSION/osx-built-keychain ||
+              OSX_VERSION=10.15 C_INCLUDE_PATH="$C_INCLUDE_PATH" V=1 \
+              build/intel-x86_64-catalina/git-$VERSION/osx-built-keychain ||
             die "Build failed"
 
           PATH=/usr/local/bin:$PATH \
           make -C git_osx_installer \
-              OSX_VERSION=10.6 C_INCLUDE_PATH="$C_INCLUDE_PATH" V=1 image ||
+              OSX_VERSION=10.15 C_INCLUDE_PATH="$C_INCLUDE_PATH" V=1 image ||
             die "Build failed"
 
           mkdir -p artifacts
