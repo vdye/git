@@ -73,7 +73,7 @@ jobs:
       - name: Clone build-extra
         shell: bash
         run: |
-          git clone --single-branch -b main https://github.com/git-for-windows/build-extra /usr/src/build-extra
+          git clone --filter=blob:none --single-branch -b main https://github.com/git-for-windows/build-extra /usr/src/build-extra
       - name: Clone git
         shell: bash
         run: |
@@ -170,7 +170,7 @@ jobs:
       - name: Clone build-extra
         shell: bash
         run: |
-          git clone --single-branch -b main https://github.com/git-for-windows/build-extra /usr/src/build-extra
+          git clone --filter=blob:none --single-branch -b main https://github.com/git-for-windows/build-extra /usr/src/build-extra
       - name: Prepare home directory for code-signing
         env:
           CODESIGN_P12: ${{secrets.CODESIGN_P12}}
@@ -207,9 +207,13 @@ jobs:
           set -x
 
           b=/usr/src/build-extra &&
+          str="recently_seen=.*\$" &&
 
-          sed -i -e \
-            's/recently_seen="\$(get_recently_seen)"/recently_seen="bogus-to-keep-pestering"/' \
+          echo $b/git-extra/git-update-git-for-windows &&
+          cat $b/git-extra/git-update-git-for-windows &&
+
+          sed -i -e '/^# when confirmation to do so is given./a\
+            use_recently_seen=no' \
             $b/git-extra/git-update-git-for-windows
       - name: Set the installer Publisher to the Git Fundamentals team
         shell: bash
