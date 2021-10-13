@@ -225,10 +225,10 @@ jobs:
             pool: ubuntu-latest
           - jobname: osx-clang
             cc: clang
-            pool: macos-latest
+            pool: macos-11
           - jobname: osx-gcc
             cc: gcc
-            pool: macos-latest
+            pool: macos-11
           - jobname: linux-gcc-default
             cc: gcc
             pool: ubuntu-latest

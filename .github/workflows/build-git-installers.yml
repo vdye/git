@@ -302,7 +302,7 @@ jobs:
 
   # Build Mac OSX installers & upload artifacts
   mac_artifacts:
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: prereqs
     env:
       # `gettext` is keg-only
