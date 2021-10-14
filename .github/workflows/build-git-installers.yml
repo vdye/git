@@ -206,15 +206,10 @@ jobs:
         run: |
           set -x
 
-          b=/usr/src/build-extra &&
-          str="recently_seen=.*\$" &&
+          b=/mingw64/bin &&
 
-          echo $b/git-extra/git-update-git-for-windows &&
-          cat $b/git-extra/git-update-git-for-windows &&
-
-          sed -i -e '/^# when confirmation to do so is given./a\
-            use_recently_seen=no' \
-            $b/git-extra/git-update-git-for-windows
+          sed -i -e '6 a use_recently_seen=no' \
+            $b/git-update-git-for-windows
       - name: Set the installer Publisher to the Git Fundamentals team
         shell: bash
         run: |
