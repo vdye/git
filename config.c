@@ -2572,6 +2572,11 @@ int git_config_get_max_percent_split_change(void)
 
 int git_config_get_virtualfilesystem(void)
 {
+	/* Run only once. */
+	static int virtual_filesystem_result = -1;
+	if (virtual_filesystem_result >= 0)
+		return virtual_filesystem_result;
+
 	if (git_config_get_pathname("core.virtualfilesystem", &core_virtualfilesystem))
 		core_virtualfilesystem = getenv("GIT_VIRTUALFILESYSTEM_TEST");
 
@@ -2593,11 +2598,13 @@ int git_config_get_virtualfilesystem(void)
 		if (should_run_hook) {
 			/* virtual file system relies on the sparse checkout logic so force it on */
 			core_apply_sparse_checkout = 1;
+			virtual_filesystem_result = 1;
 			return 1;
 		}
 		core_virtualfilesystem = NULL;
 	}
 
+	virtual_filesystem_result = 0;
 	return 0;
 }
 
