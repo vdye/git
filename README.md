@@ -62,7 +62,7 @@ since `winget` is available by default on preview versions of Windows.
 To install with Winget, run
 
 ```shell
-winget install microsoft/git
+winget install --id microsoft.git
 ```
 
 Double-check that you have the right version by running these commands,
