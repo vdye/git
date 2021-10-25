@@ -113,30 +113,8 @@ Or you can run the `git update-microsoft-git` command, which will run those
 
 ## Linux
 
-`apt-get` support is available for Ubuntu Bionic Beaver (18.04) and Hirsute
-Hippo (21.04). Take the following steps to set up and install based on the
-version you are running:
-
-### Ubuntu 18.04 (Bionic)
-
-```shell
-curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-sudo apt-add-repository https://packages.microsoft.com/ubuntu/18.04/prod
-sudo apt-get update
-sudo apt-get install microsoft-git
-```
-
-To upgrade `microsoft/git`, you can run the necessary `apt-get` commands:
-
-```shell
-sudo apt-get update
-sudo apt-get upgrade microsoft-git
-```
-
-Or you can run the `git update-microsoft-git` command, which will run those
-`apt-get` commands for you.
-
-### Ubuntu 21.04 (Hirsute)
+`apt-get` support is available for Ubuntu Hirsute
+Hippo (21.04). Take the following steps to set up and install:
 
 ```shell
 curl -sSL https://packages.microsoft.com/config/ubuntu/21.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
@@ -157,7 +135,7 @@ Or you can run the `git update-microsoft-git` command, which will run those
 
 ### Other Ubuntu/Debian distributions
 
-Please use the most recent
+On newer distributions*, you may use the most recent
 [`.deb` package](https://github.com/microsoft/git/releases). For example,
 you can download a specific version as follows:
 
@@ -176,7 +154,13 @@ scalar version
 
 To upgrade, you will need to repeat these steps to reinstall.
 
-### Non-Ubuntu/Debian distributions
+*Older distributions are missing some required dependencies. Even
+though the package may appear to install successfully, `microsoft/
+git` will not function as expected. If you are running Ubuntu 18.04 or
+older, please follow the install from source instructions below
+instead of installing the debian package.
+
+### Other distributions
 
 You will need to compile and install `microsoft/git` from source:
 
