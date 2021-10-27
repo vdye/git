@@ -6,6 +6,7 @@ GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
 export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
 
 . ./test-lib.sh
+. "$TEST_DIRECTORY"/lib-diff-data.sh
 
 test_expect_success setup '
 	git config --global advice.statusuoption false &&
@@ -64,7 +65,7 @@ EOF
 
 test_expect_success 'rename & unmerged setup' '
 	git rm -f -r . &&
-	cat "$TEST_DIRECTORY/lib-diff/README" >ONE &&
+	COPYING_test_data >ONE &&
 	git add ONE &&
 	test_tick &&
 	git commit -m "One commit with ONE" &&
