@@ -840,7 +840,7 @@ static CURL *get_curl_handle(void)
 		}
 
 		if (http_auto_client_cert) {
-#if LIBCURL_VERSION_NUM >= 0x074d00
+#if GIT_CURL_HAVE_CURLSSLOPT_AUTO_CLIENT_CERT
 			ssl_options |= CURLSSLOPT_AUTO_CLIENT_CERT;
 #endif
 		}
