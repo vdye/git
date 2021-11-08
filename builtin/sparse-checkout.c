@@ -60,6 +60,9 @@ static int sparse_checkout_list(int argc, const char **argv)
 			     builtin_sparse_checkout_list_options,
 			     builtin_sparse_checkout_list_usage, 0);
 
+	if (!core_apply_sparse_checkout)
+		die(_("sparse-checkout must be enabled to run this command"));
+
 	memset(&pl, 0, sizeof(pl));
 
 	pl.use_cone_patterns = core_sparse_checkout_cone;
@@ -679,13 +682,15 @@ static int sparse_checkout_set(int argc, const char **argv, const char *prefix,
 		OPT_END(),
 	};
 
-	repo_read_index(the_repository);
-
 	argc = parse_options(argc, argv, prefix,
 			     builtin_sparse_checkout_set_options,
 			     builtin_sparse_checkout_set_usage,
 			     PARSE_OPT_KEEP_UNKNOWN);
 
+	if (!core_apply_sparse_checkout)
+		die(_("sparse-checkout must be enabled to run this command"));
+
+	repo_read_index(the_repository);
 	return modify_pattern_list(argc, argv, m);
 }
 
@@ -703,6 +708,9 @@ static int sparse_checkout_reapply(int argc, const char **argv)
 	argc = parse_options(argc, argv, NULL,
 			     builtin_sparse_checkout_reapply_options,
 			     builtin_sparse_checkout_reapply_usage, 0);
+
+	if (!core_apply_sparse_checkout)
+		die(_("sparse-checkout must be enabled to run this command"));
 
 	repo_read_index(the_repository);
 	return update_working_directory(NULL);

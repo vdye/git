@@ -42,12 +42,13 @@ test_expect_success 'setup' '
 '
 
 test_expect_success 'git sparse-checkout list (empty)' '
-	git -C repo sparse-checkout list >list 2>err &&
+	git -C repo -c core.sparsecheckout=true sparse-checkout list >list 2>err &&
 	test_must_be_empty list &&
 	test_i18ngrep "this worktree is not sparse (sparse-checkout file may not exist)" err
 '
 
 test_expect_success 'git sparse-checkout list (populated)' '
+	git -C repo sparse-checkout init &&
 	test_when_finished rm -f repo/.git/info/sparse-checkout &&
 	cat >repo/.git/info/sparse-checkout <<-\EOF &&
 	/folder1/*
@@ -125,19 +126,8 @@ test_expect_success 'interaction with clone --no-checkout (unborn index)' '
 	check_files clone_no_checkout a folder1
 '
 
-test_expect_success 'set enables config' '
-	git init empty-config &&
-	(
-		cd empty-config &&
-		test_commit test file &&
-		test_path_is_missing .git/config.worktree &&
-		git sparse-checkout set nothing &&
-		test_path_is_file .git/config.worktree &&
-		test_cmp_config true core.sparseCheckout
-	)
-'
-
 test_expect_success 'set sparse-checkout using builtin' '
+	git -C repo sparse-checkout init &&
 	git -C repo sparse-checkout set "/*" "!/*/" "*folder*" &&
 	cat >expect <<-\EOF &&
 	/*
@@ -338,6 +328,7 @@ test_expect_success 'revert to old sparse-checkout on empty update' '
 		echo >file &&
 		git add file &&
 		git commit -m "test" &&
+		git sparse-checkout init &&
 		git sparse-checkout set nothing 2>err &&
 		test_i18ngrep ! "Sparse checkout leaves no entry on working directory" err &&
 		test_i18ngrep ! ".git/index.lock" err &&
@@ -346,6 +337,7 @@ test_expect_success 'revert to old sparse-checkout on empty update' '
 '
 
 test_expect_success 'fail when lock is taken' '
+	git -C repo sparse-checkout init &&
 	test_when_finished rm -rf repo/.git/info/sparse-checkout.lock &&
 	touch repo/.git/info/sparse-checkout.lock &&
 	test_must_fail git -C repo sparse-checkout set deep 2>err &&
@@ -703,6 +695,28 @@ test_expect_success 'cone mode clears ignored subdirectories' '
 	git -C repo status --porcelain=v2 >out &&
 	echo "? deep/deeper2/untracked" >expect &&
 	test_cmp expect out
+'
+
+test_expect_success 'list, add, set, and reapply disallowed with sparse-checkout disabled' '
+	rm -f repo/.git/info/sparse-checkout &&
+
+	# Setup sparse-checkout and disable
+	git -C repo sparse-checkout init &&
+	git -C repo sparse-checkout set deep/deeper1/ &&
+	git -C repo sparse-checkout disable &&
+
+	# Try sparse-checkout commands (fails)
+	test_must_fail git -C repo sparse-checkout list &&
+	test_must_fail git -C repo sparse-checkout add deep/deeper2/ &&
+	test_must_fail git -C repo sparse-checkout set deep/deeper2/ &&
+	test_must_fail git -C repo sparse-checkout reapply &&
+
+	# Re-enable sparse checkout, again try to add the pattern (succeeds)
+	git -C repo sparse-checkout init &&
+	git -C repo sparse-checkout list &&
+	git -C repo sparse-checkout add deep/deeper2/ &&
+	git -C repo sparse-checkout set deep/deeper1/ &&
+	git -C repo sparse-checkout reapply
 '
 
 test_done
