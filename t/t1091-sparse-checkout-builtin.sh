@@ -719,4 +719,17 @@ test_expect_success 'list, add, set, and reapply disallowed with sparse-checkout
 	git -C repo sparse-checkout reapply
 '
 
+test_expect_success 'init with cone mode verifies existing cone patterns' '
+	rm -f repo/.git/info/sparse-checkout &&
+
+	# Set non-cone mode pattern
+	git -C repo sparse-checkout init &&
+	git -C repo sparse-checkout set deep/deeper*/ &&
+	git -C repo sparse-checkout disable &&
+
+	git -C repo sparse-checkout init --cone 2>err &&
+	test_i18ngrep "disabling cone mode" err &&
+	test_must_fail git -C repo config core.sparsecheckoutcone
+'
+
 test_done
