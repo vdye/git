@@ -1274,6 +1274,8 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 	char *lock_path = xstrfmt("%s/maintenance", r->objects->odb->path);
 
 	if (hold_lock_file_for_update(&lk, lock_path, LOCK_NO_DEREF) < 0) {
+		struct stat st;
+		struct strbuf lock_dot_lock = STRBUF_INIT;
 		/*
 		 * Another maintenance command is running.
 		 *
@@ -1284,6 +1286,25 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 		if (!opts->auto_flag && !opts->quiet)
 			warning(_("lock file '%s' exists, skipping maintenance"),
 				lock_path);
+
+		/*
+		 * Check timestamp on .lock file to see if we should
+		 * delete it to recover from a fail state.
+		 */
+		strbuf_addstr(&lock_dot_lock, lock_path);
+		strbuf_addstr(&lock_dot_lock, ".lock");
+		if (lstat(lock_dot_lock.buf, &st))
+			warning_errno(_("unable to stat '%s'"), lock_dot_lock.buf);
+		else {
+			if (st.st_mtime < time(NULL) - (6 * 60 * 60)) {
+				if (unlink(lock_dot_lock.buf))
+					warning_errno(_("unable to delete stale lock file"));
+				else
+					warning(_("deleted stale lock file"));
+			}
+		}
+
+		strbuf_release(&lock_dot_lock);
 		free(lock_path);
 		return 0;
 	}
@@ -1412,6 +1433,7 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 {
 	int i;
 	struct maintenance_run_opts opts;
+	const char *tmp_obj_dir = NULL;
 	struct option builtin_maintenance_run_options[] = {
 		OPT_BOOL(0, "auto", &opts.auto_flag,
 			 N_("run tasks based on the state of the repository")),
@@ -1451,9 +1473,11 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 	 * the gvfs.sharedcache config option to redirect the
 	 * maintenance to that location.
 	 */
-	if (!git_config_get_value("gvfs.sharedcache", &object_dir) &&
-	    object_dir)
+	if (!git_config_get_value("gvfs.sharedcache", &tmp_obj_dir) &&
+	    tmp_obj_dir) {
+		object_dir = xstrdup(tmp_obj_dir);
 		setenv(DB_ENVIRONMENT, object_dir, 1);
+	}
 
 	return maintenance_run_tasks(&opts);
 }
