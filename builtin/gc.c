@@ -1433,6 +1433,7 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 {
 	int i;
 	struct maintenance_run_opts opts;
+	const char *tmp_obj_dir = NULL;
 	struct option builtin_maintenance_run_options[] = {
 		OPT_BOOL(0, "auto", &opts.auto_flag,
 			 N_("run tasks based on the state of the repository")),
@@ -1472,9 +1473,11 @@ static int maintenance_run(int argc, const char **argv, const char *prefix)
 	 * the gvfs.sharedcache config option to redirect the
 	 * maintenance to that location.
 	 */
-	if (!git_config_get_value("gvfs.sharedcache", &object_dir) &&
-	    object_dir)
+	if (!git_config_get_value("gvfs.sharedcache", &tmp_obj_dir) &&
+	    tmp_obj_dir) {
+		object_dir = xstrdup(tmp_obj_dir);
 		setenv(DB_ENVIRONMENT, object_dir, 1);
+	}
 
 	return maintenance_run_tasks(&opts);
 }
