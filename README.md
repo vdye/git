@@ -101,43 +101,21 @@ git version
 scalar version
 ```
 
-To upgrade `microsoft/git`, you can run the necessary `brew` commands:
+To upgrade microsoft/git, you can run the necessary `brew` commands:
 
 ```shell
 brew update
 brew upgrade --cask microsoft-git
 ```
 
-Or you can run the `git update-microsoft-git` command, which will run those
-`brew` commands for you.
+Or you can run the `git update-microsoft-git` command, which will run those brew commands for you.
 
 ## Linux
-
-`apt-get` support is available for Ubuntu Hirsute
-Hippo (21.04). Take the following steps to set up and install:
-
-```shell
-curl -sSL https://packages.microsoft.com/config/ubuntu/21.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
-curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
-sudo apt-get update
-sudo apt-get install microsoft-git
-```
-
-To upgrade `microsoft/git`, you can run the necessary `apt-get` commands:
-
-```shell
-sudo apt-get update
-sudo apt-get upgrade microsoft-git
-```
-
-Or you can run the `git update-microsoft-git` command, which will run those
-`apt-get` commands for you.
-
-### Other Ubuntu/Debian distributions
+### Ubuntu/Debian distributions
 
 On newer distributions*, you may use the most recent
-[`.deb` package](https://github.com/microsoft/git/releases). For example,
-you can download a specific version as follows:
+[Debian package](https://github.com/microsoft/git/releases). For
+example, you can download a specific version as follows:
 
 ```shell
 wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.33.0.vfs.0.0/microsoft-git_2.33.0.vfs.0.0.deb
