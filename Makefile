@@ -2100,6 +2100,15 @@ GIT-USER-AGENT: FORCE
 		echo '$(GIT_USER_AGENT_SQ)' >GIT-USER-AGENT; \
 	fi
 
+GIT_BUILT_FROM_COMMIT = $(shell \
+	GIT_CEILING_DIRECTORIES="$(CURDIR)/.." \
+	git rev-parse -q --verify HEAD 2>/dev/null)
+GIT-BUILT-FROM-COMMIT: FORCE
+	@if test x'$(GIT_BUILT_FROM_COMMIT)' != x"`cat GIT-BUILT-FROM-COMMIT 2>/dev/null`" ; then \
+		echo >&2 "    * new built-from commit"; \
+		echo '$(GIT_BUILT_FROM_COMMIT)' >GIT-BUILT-FROM-COMMIT; \
+	fi
+
 ifdef DEFAULT_HELP_FORMAT
 BASIC_CFLAGS += -DDEFAULT_HELP_FORMAT='"$(DEFAULT_HELP_FORMAT)"'
 endif
@@ -2223,13 +2232,11 @@ builtin/help.sp builtin/help.s builtin/help.o: EXTRA_CPPFLAGS = \
 	'-DGIT_MAN_PATH="$(mandir_relative_SQ)"' \
 	'-DGIT_INFO_PATH="$(infodir_relative_SQ)"'
 
-version.sp version.s version.o: GIT-VERSION-FILE GIT-USER-AGENT
+version.sp version.s version.o: GIT-VERSION-FILE GIT-USER-AGENT GIT-BUILT-FROM-COMMIT
 version.sp version.s version.o: EXTRA_CPPFLAGS = \
 	'-DGIT_VERSION="$(GIT_VERSION)"' \
 	'-DGIT_USER_AGENT=$(GIT_USER_AGENT_CQ_SQ)' \
-	'-DGIT_BUILT_FROM_COMMIT="$(shell \
-		GIT_CEILING_DIRECTORIES="$(CURDIR)/.." \
-		git rev-parse -q --verify HEAD 2>/dev/null)"'
+	'-DGIT_BUILT_FROM_COMMIT="$(GIT_BUILT_FROM_COMMIT)"'
 
 $(BUILT_INS): git$X
 	$(QUIET_BUILT_IN)$(RM) $@ && \
