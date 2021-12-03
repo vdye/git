@@ -408,9 +408,6 @@ static int add_cacheinfo(unsigned int mode, const struct object_id *oid,
 	if (!verify_path(path, mode))
 		return error("Invalid path '%s'", path);
 
-	if (S_ISSPARSEDIR(mode))
-		return error("%s: cannot add directory as cache entry", path);
-
 	len = strlen(path);
 	ce = make_empty_cache_entry(&the_index, len);
 
@@ -419,6 +416,18 @@ static int add_cacheinfo(unsigned int mode, const struct object_id *oid,
 	ce->ce_flags = create_ce_flags(stage);
 	ce->ce_namelen = len;
 	ce->ce_mode = create_ce_mode(mode);
+
+	if (S_ISSPARSEDIR(mode)) {
+		if (!the_index.sparse_index)
+			return error("%s: cannot add directory as cache entry", path);
+
+		/*
+		 * If adding a sparse directory to a sparse index, force it to
+		 * have skip-worktree enabled.
+		 */
+		ce->ce_flags |= CE_SKIP_WORKTREE;
+	}
+
 	if (assume_unchanged)
 		ce->ce_flags |= CE_VALID;
 	option = allow_add ? ADD_CACHE_OK_TO_ADD : 0;

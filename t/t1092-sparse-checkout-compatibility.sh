@@ -741,8 +741,15 @@ test_expect_success 'update-index --cacheinfo' '
 	test_all_match git update-index --cacheinfo 100644 $deep_a_oid deep/a &&
 	test_all_match git status --porcelain=v2 &&
 
-	# Cannot add sparse directory, even in sparse index case
-	test_all_match test_must_fail git update-index --add --cacheinfo 040000 $folder2_oid folder2/ &&
+	# Cannot add sparse directory in non-sparse index
+	test_must_fail git -C full-checkout update-index --add --cacheinfo 040000 $folder2_oid folder2/ &&
+	test_must_fail git -C sparse-checkout update-index --add --cacheinfo 040000 $folder2_oid folder2/ &&
+
+	# Sparse directories *can* be added in a sparse index
+	git -C sparse-index update-index --add --cacheinfo 040000 $folder2_oid folder2/ &&
+
+	# Reset all repositories before next test (currently in a mismatched state)
+	test_all_match git reset --hard &&
 
 	# Sparse match only - because folder1/a is outside the sparse checkout
 	# definition (and thus not on-disk), it will appear "deleted" in
