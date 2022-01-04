@@ -310,6 +310,8 @@ static inline int setitimer(int which, const struct itimerval *value, struct iti
 
 #ifndef NO_LIBGEN_H
 #include <libgen.h>
+#define basename gitbasename
+char *gitbasename(char *);
 #else
 #define basename gitbasename
 char *gitbasename(char *);
