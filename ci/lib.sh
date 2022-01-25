@@ -6,6 +6,13 @@
 # and installing dependencies.
 set -ex
 
+# Starting assertions
+if test -z "$jobname"
+then
+	echo "must set a CI jobname" >&2
+	exit 1
+fi
+
 skip_branch_tip_with_tag () {
 	# Sometimes, a branch is pushed at the same time the tag that points
 	# at the same commit as the tip of the branch is pushed, and building
@@ -145,11 +152,6 @@ mkdir -p "$cache_dir"
 test -n "${DONT_SKIP_TAGS-}" ||
 skip_branch_tip_with_tag
 skip_good_tree
-
-if test -z "$jobname"
-then
-	jobname="$CI_OS_NAME-$CC"
-fi
 
 export DEVELOPER=1
 export DEFAULT_TEST_TARGET=prove
