@@ -77,9 +77,6 @@ do
 			fi
 			combined_trash_size=$new_combined_trash_size
 
-			# DO NOT modify these two 'echo'-ed strings below
-			# without updating 'ci/util/extract-trash-dirs.sh'
-			# as well.
 			echo "$(tput setaf 1)Start of trash directory of '$test_name':$(tput sgr0)"
 			cat "$trash_tgz_b64"
 			echo "$(tput setaf 1)End of trash directory of '$test_name'$(tput sgr0)"
