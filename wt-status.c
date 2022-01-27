@@ -651,6 +651,15 @@ static void wt_status_collect_changes_index(struct wt_status *s)
 	rev.diffopt.detect_rename = s->detect_rename >= 0 ? s->detect_rename : rev.diffopt.detect_rename;
 	rev.diffopt.rename_limit = s->rename_limit >= 0 ? s->rename_limit : rev.diffopt.rename_limit;
 	rev.diffopt.rename_score = s->rename_score >= 0 ? s->rename_score : rev.diffopt.rename_score;
+
+	/*
+	 * The `recursive` option must be enabled to show differences in files
+	 * *more than* one level deep in a sparse directory index entry (e.g., given
+	 * sparse directory 'sparse-dir/', reporting a difference in the file
+	 * 'sparse-dir/another-dir/my-file').
+	 */
+	rev.diffopt.flags.recursive = 1;
+
 	copy_pathspec(&rev.prune_data, &s->pathspec);
 	run_diff_index(&rev, 1);
 	object_array_clear(&rev.pending);
