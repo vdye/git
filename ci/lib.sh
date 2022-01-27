@@ -5,6 +5,13 @@ set -ex
 . ${0%/*}/lib-ci-type.sh
 
 # Starting assertions
+mode=$1
+if test -z "$mode"
+then
+	echo "need a $0 mode, e.g. --build or --test"
+	exit 1
+fi
+
 if test -z "$jobname"
 then
 	echo "must set a CI jobname" >&2
@@ -13,9 +20,14 @@ fi
 
 # Helper functions
 setenv () {
+	skip=
 	varmode=
 	case "$1" in
 	--*)
+		if test "$1" != "$mode" && test "$1" != "--all"
+		then
+			skip=t
+		fi
 		varmode=$1
 		shift
 		;;
@@ -24,6 +36,11 @@ setenv () {
 	key=$1
 	val=$2
 	shift 2
+
+	if test -n "$skip"
+	then
+		return 0
+	fi
 
 	if test -n "$GITHUB_ENV"
 	then
