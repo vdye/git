@@ -1152,10 +1152,19 @@ static int unpack_single_entry(int n, unsigned long mask,
 		return rc;
 	}
 
-	for (i = 0; i < n; i++)
-		if (src[i] && src[i] != o->df_conflict_entry)
+	for (i = 0; i < n; i++) {
+		if (src[i] && src[i] != o->df_conflict_entry) {
+			/*
+			 * Replacing index rather than merging, so we determine
+			 * value of SKIP_WORKTREE based on sparse checkout patterns.
+			 */
+			if (!path_in_sparse_checkout(src[i]->name, o->src_index))
+				src[i]->ce_flags |= CE_SKIP_WORKTREE;
+
 			if (do_add_entry(o, src[i], 0, 0))
 				return -1;
+		}
+	}
 
 	return 0;
 }

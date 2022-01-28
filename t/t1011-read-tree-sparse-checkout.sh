@@ -89,6 +89,31 @@ test_expect_success 'read-tree with empty .git/info/sparse-checkout' '
 	! test -f sub/added
 '
 
+test_expect_success 'read-tree sets skip-worktree' '
+	cat >expected.swt-skipworktree <<-\EOF &&
+	S init.t
+	S sub/added
+	S sub/addedtoo
+	S subsub/added
+	EOF
+
+	git config core.sparsecheckout true &&
+	echo >.git/info/sparse-checkout &&
+
+	git read-tree HEAD &&
+	git ls-files -t >result &&
+	test_cmp expected.swt-skipworktree result
+'
+
+test_expect_success 'read-tree --no-sparse-checkout does not set skip-worktree' '
+	git config core.sparsecheckout true &&
+	echo >.git/info/sparse-checkout &&
+
+	git read-tree --no-sparse-checkout HEAD &&
+	git ls-files -t >result &&
+	test_cmp expected.swt result
+'
+
 test_expect_success 'match directories with trailing slash' '
 	cat >expected.swt-noinit <<-\EOF &&
 	S init.t
