@@ -163,6 +163,13 @@ struct traverse_info {
 
 	/* tells whether to stop at the first error or not. */
 	int show_all_errors;
+
+	/*
+	 * tells whether this traversal is over the contents of a sparse directory
+	 * index entry, signaling to two- and three-way merges that the index
+	 * should not be searched for a mergeable entry.
+	 */
+	int merging_sparse_dir;
 };
 
 /**

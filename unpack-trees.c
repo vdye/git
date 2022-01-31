@@ -1096,6 +1096,32 @@ static int unpack_single_entry(int n, unsigned long mask,
 	struct unpack_trees_options *o = info->data;
 	unsigned long conflicts = info->df_conflicts | dirmask;
 
+	/*
+	 * If we're merging a sparse directory, src[0] will be a transient cache
+	 * entry derived from the first tree (rather than a real entry in the source
+	 * index). Create the temporary entry as if it came from an expanded index.
+	 */
+	if (info->merging_sparse_dir) {
+		if (!is_null_oid(&names[0].oid)) {
+			src[0] = create_ce_entry(info, &names[0], 0,
+						&o->result, 1,
+						dirmask & (1ul << 0));
+			src[0]->ce_flags |= (CE_SKIP_WORKTREE | CE_NEW_SKIP_WORKTREE);
+		}
+
+		/*
+		 * Normally, o->merge indicates that src[0] is derived directly from
+		 * the index, rather than an entry in 'names'. This is *not* true when
+		 * merging a sparse directory; there, names[0] is the "index" source
+		 * entry. Now that we're done using names[0], shift past the "index"
+		 * tree and adjust 'names', 'n', 'mask', and 'dirmask' accordingly.
+		 */
+		n--;
+		names++;
+		mask >>= 1;
+		dirmask >>= 1;
+	}
+
 	if (mask == dirmask && !src[0])
 		return 0;
 
@@ -1114,6 +1140,7 @@ static int unpack_single_entry(int n, unsigned long mask,
 	for (i = 0; i < n; i++) {
 		int stage;
 		unsigned int bit = 1ul << i;
+
 		if (conflicts & bit) {
 			src[i + o->merge] = o->df_conflict_entry;
 			continue;
@@ -1144,11 +1171,15 @@ static int unpack_single_entry(int n, unsigned long mask,
 	if (o->merge) {
 		int rc = call_unpack_fn((const struct cache_entry * const *)src,
 					o);
+
+		if (info->merging_sparse_dir && src[0])
+			discard_cache_entry(src[0]);
 		for (i = 0; i < n; i++) {
 			struct cache_entry *ce = src[i + o->merge];
 			if (ce != o->df_conflict_entry)
 				discard_cache_entry(ce);
 		}
+
 		return rc;
 	}
 
@@ -1388,7 +1419,7 @@ static int unpack_callback(int n, unsigned long mask, unsigned long dirmask, str
 		debug_unpack_callback(n, mask, dirmask, names, info);
 
 	/* Are we supposed to look at the index too? */
-	if (o->merge) {
+	if (o->merge && !info->merging_sparse_dir) {
 		int hint = -1;
 		while (1) {
 			int cmp;
@@ -2475,6 +2506,38 @@ static int merged_entry(const struct cache_entry *ce,
 	return 1;
 }
 
+static int merged_sparse_dir(const struct cache_entry * const *src, int n,
+			     struct unpack_trees_options *o)
+{
+	struct tree_desc t[MAX_UNPACK_TREES + 1];
+	void * tree_bufs[MAX_UNPACK_TREES + 1];
+	struct traverse_info info;
+	int i, ret;
+
+	/*
+	 * Create the tree traversal information for traversing into *only* the
+	 * sparse directory.
+	 */
+	setup_traverse_info(&info, src[0]->name);
+	info.merging_sparse_dir = 1;
+	info.fn = unpack_callback;
+	info.data = o;
+	info.show_all_errors = o->show_all_errors;
+	info.pathspec = o->pathspec;
+
+	/* Get the tree descriptors of the sparse directory in each of the merging trees */
+	for (i = 0; i < n; i++)
+		tree_bufs[i] = fill_tree_descriptor(o->src_index->repo, &t[i],
+						    src[i] && !is_null_oid(&src[i]->oid) ? &src[i]->oid : NULL);
+
+	ret = traverse_trees(o->src_index, n, t, &info);
+
+	for (i = 0; i < n; i++)
+		free(tree_bufs[i]);
+
+	return ret;
+}
+
 static int deleted_entry(const struct cache_entry *ce,
 			 const struct cache_entry *old,
 			 struct unpack_trees_options *o)
@@ -2745,6 +2808,14 @@ int twoway_merge(const struct cache_entry * const *src,
 			 * reject the merge instead.
 			 */
 			return merged_entry(newtree, current, o);
+		} else if (S_ISSPARSEDIR(current->ce_mode)) {
+			/*
+			 * The sparse directories differ, but we don't know whether that's
+			 * because of two different files in the directory being modified
+			 * (can be trivially merged) or if there is a real file conflict.
+			 * Merge the sparse directory by OID to compare file-by-file.
+			 */
+			return merged_sparse_dir(src, 3, o);
 		} else
 			return reject_merge(current, o);
 	}
