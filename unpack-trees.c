@@ -2642,16 +2642,24 @@ int threeway_merge(const struct cache_entry * const *stages,
 	 */
 	/* #14, #14ALT, #2ALT */
 	if (remote && !df_conflict_head && head_match && !remote_match) {
-		if (index && !same(index, remote) && !same(index, head))
-			return reject_merge(index, o);
+		if (index && !same(index, remote) && !same(index, head)) {
+			if (S_ISSPARSEDIR(index->ce_mode))
+				return merged_sparse_dir(stages, 4, o);
+			else
+				return reject_merge(index, o);
+		}
 		return merged_entry(remote, index, o);
 	}
 	/*
 	 * If we have an entry in the index cache, then we want to
 	 * make sure that it matches head.
 	 */
-	if (index && !same(index, head))
-		return reject_merge(index, o);
+	if (index && !same(index, head)) {
+		if (S_ISSPARSEDIR(index->ce_mode))
+			return merged_sparse_dir(stages, 4, o);
+		else
+			return reject_merge(index, o);
+	}
 
 	if (head) {
 		/* #5ALT, #15 */
