@@ -55,6 +55,13 @@ setenv () {
 # Clear MAKEFLAGS that may come from the outside world.
 MAKEFLAGS=
 
+# Common make and cmake build options
+DEVELOPER=1
+SKIP_DASHED_BUILT_INS=YesPlease
+
+# Use common options for "make" (cmake in "vs-build" below)
+MAKEFLAGS="DEVELOPER=$DEVELOPER SKIP_DASHED_BUILT_INS=$SKIP_DASHED_BUILT_INS"
+
 case "$CI_TYPE" in
 github-actions)
 	CC="${CC:-gcc}"
@@ -73,10 +80,8 @@ github-actions)
 	;;
 esac
 
-setenv --build DEVELOPER 1
 setenv --test DEFAULT_TEST_TARGET prove
 setenv --test GIT_TEST_CLONE_2GB true
-setenv --build SKIP_DASHED_BUILT_INS YesPlease
 
 case "$runs_on_pool" in
 ubuntu-latest)
@@ -110,6 +115,9 @@ windows-build)
 	setenv --build ARTIFACTS_DIRECTORY artifacts
 	;;
 vs-build)
+	setenv --build DEVELOPER $DEVELOPER
+	setenv --build SKIP_DASHED_BUILT_INS $SKIP_DASHED_BUILT_INS
+
 	setenv --build NO_PERL NoThanks
 	setenv --build NO_GETTEXT NoThanks
 	setenv --build ARTIFACTS_DIRECTORY artifacts
