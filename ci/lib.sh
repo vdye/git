@@ -1,5 +1,5 @@
 #!/bin/sh
-set -ex
+set -e
 
 # Helper libraries
 . ${0%/*}/lib-ci-type.sh
@@ -11,12 +11,16 @@ then
 	echo "need a $0 mode, e.g. --build or --test"
 	exit 1
 fi
+echo "CONFIG: mode=$mode" >&2
 
 if test -z "$jobname"
 then
 	echo "must set a CI jobname" >&2
 	exit 1
 fi
+echo "CONFIG: jobname=$jobname" >&2
+echo "CONFIG: runs_on_pool=$runs_on_pool" >&2
+echo "CONFIG: GITHUB_ENV=$GITHUB_ENV" >&2
 
 # Helper functions
 setenv () {
@@ -39,6 +43,7 @@ setenv () {
 
 	if test -n "$skip"
 	then
+		echo "SKIP '$key=$val'" >&2
 		return 0
 	fi
 
@@ -50,6 +55,8 @@ setenv () {
 		# itself.
 		eval "export $key=\"$val\""
 	fi
+
+	echo "SET: '$key=$val'" >&2
 }
 
 # Clear variables that may come from the outside world.

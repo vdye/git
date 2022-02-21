@@ -6,3 +6,5 @@ else
 	env >&2
 	exit 1
 fi
+
+echo "CONFIG: CI_TYPE=$CI_TYPE" >&2
