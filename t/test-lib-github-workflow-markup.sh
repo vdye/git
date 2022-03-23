@@ -45,10 +45,10 @@ finalize_test_case_output () {
 		return
 		;;
 	esac
-	echo >>$github_markup_output "::group::$test_case_result: $this_test.$test_count $*"
+	#echo >>$github_markup_output "::group::$test_case_result: $this_test.$test_count $*"
 	test-tool >>$github_markup_output path-utils skip-n-bytes \
 		"$GIT_TEST_TEE_OUTPUT_FILE" $GIT_TEST_TEE_OFFSET
-	echo >>$github_markup_output "::endgroup::"
+	#echo >>$github_markup_output "::endgroup::"
 }
 
 # No need to override finalize_test_output

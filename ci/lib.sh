@@ -177,7 +177,9 @@ then
 			test_name="${test_exit%.exit}"
 			test_name="${test_name##*/}"
 			printf "\\e[33m\\e[1m=== Failed test: ${test_name} ===\\e[m\\n"
+			printf "::group::Details\\n"
 			cat "t/test-results/$test_name.markup"
+			printf "\\n::endgroup::\\n"
 
 			trash_dir="t/trash directory.$test_name"
 			cp "t/test-results/$test_name.out" t/failed-test-artifacts/
