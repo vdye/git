@@ -1,8 +1,8 @@
 name: Scalar Functional Tests
 
 env:
-  SCALAR_REPOSITORY: microsoft/scalar
-  SCALAR_REF: main
+  SCALAR_REPOSITORY: vdye/scalar
+  SCALAR_REF: bugfix/new-sparse-behavior-2.36
   DEBUG_WITH_TMATE: false
   SCALAR_TEST_SKIP_VSTS_INFO: true
 
@@ -11,6 +11,7 @@ on:
     branches: [ vfs-*, tentative/vfs-* ]
   pull_request:
     branches: [ vfs-*, features/* ]
+  workflow_dispatch:
 
 jobs:
   scalar:
