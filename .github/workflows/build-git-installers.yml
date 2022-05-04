@@ -493,6 +493,12 @@ jobs:
           Import-PfxCertificate request_signing_cert.pfx -CertStoreLocation Cert:\LocalMachine\My
       - uses: actions/setup-python@v2
       - name: Run ESRP client
+        env:
+          AZURE_AAD_ID: ${{ secrets.AZURE_AAD_ID }}
+          # We temporarily need two AAD IDs, as we're using an SSL certificate associated
+          # with an older App Registration until we have the required hardware to approve
+          # the new certificate in SSL Admin.
+          AZURE_AAD_ID_TEMP: ${{ secrets.AAD_ID_TEMP }}
         run: python .github/scripts/sign-debian-packages.py
       - name: Upload signed artifact
         uses: actions/upload-artifact@v2

@@ -7,7 +7,8 @@ import sys
 
 esrp_tool = os.path.join("esrp", "tools", "EsrpClient.exe")
 
-AAD_ID  = "6db94d07-8532-429f-9080-5e889a85873c"
+AAD_ID  = os.environ['AZURE_AAD_ID'].strip()
+AAD_ID_TEMP = os.environ['AZURE_AAD_ID_TEMP'].strip()
 WORKSPACE = os.environ['GITHUB_WORKSPACE'].strip()
 ARTIFACTS_DIR = os.environ['ARTIFACTS_DIR'].strip()
 
@@ -32,7 +33,7 @@ def main():
         "TenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
         "ClientId": AAD_ID,
         "AuthCert": {
-            "SubjectName": f"CN={AAD_ID}.microsoft.com",
+            "SubjectName": f"CN={AAD_ID_TEMP}.microsoft.com",
             "StoreLocation": "LocalMachine",
             "StoreName": "My",
         },
