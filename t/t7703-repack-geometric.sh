@@ -180,6 +180,40 @@ test_expect_success '--geometric ignores kept packs' '
 	)
 '
 
+test_expect_success '--geometric ignores --keep-pack packs' '
+	git init geometric &&
+	test_when_finished "rm -fr geometric" &&
+	(
+		cd geometric &&
+
+		# Create two equal-sized packs
+		test_commit kept && # 3 objects
+		test_commit pack && # 3 objects
+
+		KEPT=$(git pack-objects --revs $objdir/pack/pack <<-EOF
+		refs/tags/kept
+		EOF
+		) &&
+		PACK=$(git pack-objects --revs $objdir/pack/pack <<-EOF
+		refs/tags/pack
+		^refs/tags/kept
+		EOF
+		) &&
+
+		# Prune loose objects that are now packed into PACK and KEEP
+		git prune-packed &&
+
+		git repack --geometric 2 -dm --keep-pack=pack-$KEPT.pack >out &&
+
+		# Packs should not have changed (only one non-kept pack, no
+		# loose objects), but midx should now exist.
+		test_i18ngrep "Nothing new to pack" out &&
+		test_path_is_file $midx &&
+		test_path_is_file $objdir/pack/pack-$KEPT.pack &&
+		git fsck
+	)
+'
+
 test_expect_success '--geometric chooses largest MIDX preferred pack' '
 	git init geometric &&
 	test_when_finished "rm -fr geometric" &&
