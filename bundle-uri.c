@@ -434,6 +434,124 @@ static int download_bundle_to_file(struct remote_bundle_info *bundle, void *data
 	return 0;
 }
 
+struct sorted_bundle_list {
+	struct remote_bundle_info **items;
+	size_t alloc;
+	size_t nr;
+};
+
+static int insert_bundle(struct remote_bundle_info *bundle, void *data)
+{
+	struct sorted_bundle_list *list = data;
+	list->items[list->nr++] = bundle;
+	return 0;
+}
+
+static int compare_creation_token(const void *va, const void *vb)
+{
+	const struct remote_bundle_info * const *a = va;
+	const struct remote_bundle_info * const *b = vb;
+
+	if ((*a)->creationToken > (*b)->creationToken)
+		return -1;
+	if ((*a)->creationToken < (*b)->creationToken)
+		return 1;
+	return 0;
+}
+
+static int fetch_bundles_by_token(struct repository *r,
+				  struct bundle_list *list)
+{
+	int cur;
+	int pop_or_push = 0;
+	struct bundle_list_context ctx = {
+		.r = r,
+		.list = list,
+		.mode = list->mode,
+	};
+	struct sorted_bundle_list sorted = {
+		.alloc = hashmap_get_size(&list->bundles),
+	};
+
+	ALLOC_ARRAY(sorted.items, sorted.alloc);
+
+	for_all_bundles_in_list(list, insert_bundle, &sorted);
+
+	QSORT(sorted.items, sorted.nr, compare_creation_token);
+
+	/*
+	 * Use a stack-based approach to download the bundles and attempt
+	 * to unbundle them in decreasing order by creation token. If we
+	 * fail to unbundle (after a successful download) then move to the
+	 * next non-downloaded bundle (push to the stack) and attempt
+	 * downloading. Once we succeed in applying a bundle, move to the
+	 * previous unapplied bundle (pop the stack) and attempt to unbundle
+	 * it again.
+	 *
+	 * In the case of a fresh clone, we will likely download all of the
+	 * bundles before successfully unbundling the oldest one, then the
+	 * rest of the bundles unbundle successfully in increasing order
+	 * of creationToken.
+	 *
+	 * If there are existing objects, then this process may terminate
+	 * early when all required commits from "new" bundles exist in the
+	 * repo's object store.
+	 */
+	cur = 0;
+	while (cur >= 0 && cur < sorted.nr) {
+		struct remote_bundle_info *bundle = sorted.items[cur];
+		if (!bundle->file) {
+			/* Not downloaded yet. Try downloading. */
+			if (download_bundle_to_file(bundle, &ctx)) {
+				/* Failure. Push to the stack. */
+				pop_or_push = 1;
+				goto stack_operation;
+			}
+
+			/* We expect bundles when using creationTokens. */
+			if (!is_bundle(bundle->file, 1)) {
+				warning(_("file downloaded from '%s' is not a bundle"),
+					bundle->uri);
+				break;
+			}
+		}
+
+		if (bundle->file && !bundle->unbundled) {
+			/*
+			 * This was downloaded, but not successfully
+			 * unbundled. Try unbundling again.
+			 */
+			if (unbundle_from_file(ctx.r, bundle->file)) {
+				/* Failed to unbundle. Push to stack. */
+				pop_or_push = 1;
+			} else {
+				/* Succeeded in unbundle. Pop stack. */
+				pop_or_push = -1;
+			}
+		}
+
+		/*
+		 * Else case: downloaded and unbundled successfully.
+		 * Skip this by moving in the same direction as the
+		 * previous step.
+		 */
+
+stack_operation:
+		/* Move in the specified direction and repeat. */
+		cur += pop_or_push;
+	}
+
+	free(sorted.items);
+
+	/*
+	 * We succeed if the loop terminates because 'cur' drops below
+	 * zero. The other case is that we terminate because 'cur'
+	 * reaches the end of the list, so we have a failure no matter
+	 * which bundles we apply from the list.
+	 */
+	return cur >= 0;
+}
+
 static int download_bundle_list(struct repository *r,
 				struct bundle_list *local_list,
 				struct bundle_list *global_list,
@@ -471,7 +589,14 @@ static int fetch_bundle_list_in_config_format(struct repository *r,
 		goto cleanup;
 	}
 
-	if ((result = download_bundle_list(r, &list_from_bundle,
+	/*
+	 * If this list uses the creationToken heuristic, then the URIs
+	 * it advertises are expected to be bundles, not nested lists.
+	 * We can drop 'global_list' and 'depth'.
+	 */
+	if (list_from_bundle.heuristic == BUNDLE_HEURISTIC_CREATIONTOKEN)
+		result = fetch_bundles_by_token(r, &list_from_bundle);
+	else if ((result = download_bundle_list(r, &list_from_bundle,
 					   global_list, depth)))
 		goto cleanup;
 
@@ -613,6 +738,14 @@ int fetch_bundle_list(struct repository *r, struct bundle_list *list)
 	int result;
 	struct bundle_list global_list;
 
+	/*
+	 * If the creationToken heuristic is used, then the URIs
+	 * advertised by 'list' are not nested lists and instead
+	 * direct bundles. We do not need to use global_list.
+	 */
+	if (list->heuristic == BUNDLE_HEURISTIC_CREATIONTOKEN)
+		return fetch_bundles_by_token(r, list);
+
 	init_bundle_list(&global_list);
 
 	/* If a bundle is added to this global list, then it is required. */
@@ -621,7 +754,10 @@ int fetch_bundle_list(struct repository *r, struct bundle_list *list)
 	if ((result = download_bundle_list(r, list, &global_list, 0)))
 		goto cleanup;
 
-	result = unbundle_all_bundles(r, &global_list);
+	if (list->heuristic == BUNDLE_HEURISTIC_CREATIONTOKEN)
+		result = fetch_bundles_by_token(r, list);
+	else
+		result = unbundle_all_bundles(r, &global_list);
 
 cleanup:
 	for_all_bundles_in_list(&global_list, unlink_bundle, NULL);

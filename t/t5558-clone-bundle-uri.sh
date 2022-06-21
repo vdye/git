@@ -368,6 +368,8 @@ test_expect_success 'clone bundle list (HTTP, any mode)' '
 '
 
 test_expect_success 'clone bundle list (http, creationToken)' '
+	test_when_finished rm -f trace*.txt &&
+
 	cp clone-from/bundle-*.bundle "$HTTPD_DOCUMENT_ROOT_PATH/" &&
 	cat >"$HTTPD_DOCUMENT_ROOT_PATH/bundle-list" <<-EOF &&
 	[bundle]
@@ -392,10 +394,45 @@ test_expect_success 'clone bundle list (http, creationToken)' '
 		creationToken = 4
 	EOF
 
-	git clone --bundle-uri="$HTTPD_URL/bundle-list" . clone-list-http-2 &&
+	GIT_TRACE2_EVENT=$(pwd)/trace-clone.txt \
+	git clone --bundle-uri="$HTTPD_URL/bundle-list" \
+		clone-from clone-list-http-2 &&
 
 	git -C clone-from for-each-ref --format="%(objectname)" >oids &&
-	git -C clone-list-http-2 cat-file --batch-check <oids
+	git -C clone-list-http-2 cat-file --batch-check <oids &&
+
+	for b in 1 2 3 4
+	do
+		test_bundle_downloaded bundle-$b.bundle trace-clone.txt ||
+			return 1
+	done
+'
+
+test_expect_success 'clone bundle list (http, creationToken)' '
+	test_when_finished rm -f trace*.txt &&
+
+	cp clone-from/bundle-*.bundle "$HTTPD_DOCUMENT_ROOT_PATH/" &&
+	cat >"$HTTPD_DOCUMENT_ROOT_PATH/bundle-list" <<-EOF &&
+	[bundle]
+		version = 1
+		mode = all
+		heuristic = creationToken
+
+	[bundle "bundle-1"]
+		uri = bundle-1.bundle
+		creationToken = 1
+
+	[bundle "bundle-2"]
+		uri = bundle-2.bundle
+		creationToken = 2
+	EOF
+
+	GIT_TRACE2_EVENT=$(pwd)/trace-clone.txt \
+	git clone --bundle-uri="$HTTPD_URL/bundle-list" \
+		clone-from clone-token-http &&
+
+	test_bundle_downloaded bundle-1.bundle trace-clone.txt &&
+	test_bundle_downloaded bundle-2.bundle trace-clone.txt
 '
 
 # Do not add tests here unless they use the HTTP server, as they will
