@@ -288,7 +288,6 @@ test_expect_success 'root directory cannot be sparse' '
 
 	# Verify sparse directories still present, root directory is not sparse
 	cat >expect <<-EOF &&
-	before/
 	folder1/
 	folder2/
 	x/
