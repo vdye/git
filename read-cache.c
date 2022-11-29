@@ -2257,7 +2257,7 @@ static void set_new_index_sparsity(struct index_state *istate)
 	 * repo settings.
 	 */
 	prepare_repo_settings(istate->repo);
-	if (!istate->repo->settings.command_requires_full_index &&
+	if (!command_requires_full_index &&
 	    is_sparse_index_allowed(istate, 0))
 		istate->sparse_index = 1;
 }
@@ -2391,7 +2391,7 @@ int do_read_index(struct index_state *istate, const char *path, int must_exist)
 	 * settings and other properties of the index (if necessary).
 	 */
 	prepare_repo_settings(istate->repo);
-	if (istate->repo->settings.command_requires_full_index)
+	if (command_requires_full_index)
 		ensure_full_index(istate);
 	else
 		ensure_correct_sparsity(istate);

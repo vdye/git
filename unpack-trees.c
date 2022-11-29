@@ -1890,7 +1890,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 	trace2_region_enter("unpack_trees", "unpack_trees", the_repository);
 
 	prepare_repo_settings(repo);
-	if (repo->settings.command_requires_full_index) {
+	if (command_requires_full_index) {
 		ensure_full_index(o->src_index);
 		if (o->dst_index)
 			ensure_full_index(o->dst_index);
@@ -1948,7 +1948,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 	o->internal.result.fsmonitor_has_run_once = o->src_index->fsmonitor_has_run_once;
 
 	if (!o->src_index->initialized &&
-	    !repo->settings.command_requires_full_index &&
+	    !command_requires_full_index &&
 	    is_sparse_index_allowed(&o->internal.result, 0))
 		o->internal.result.sparse_index = 1;
 

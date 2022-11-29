@@ -105,12 +105,4 @@ void prepare_repo_settings(struct repository *r)
 		else
 			die("unknown fetch negotiation algorithm '%s'", strval);
 	}
-
-	/*
-	 * This setting guards all index reads to require a full index
-	 * over a sparse index. After suitable guards are placed in the
-	 * codebase around uses of the index, this setting will be
-	 * removed.
-	 */
-	r->settings.command_requires_full_index = 1;
 }

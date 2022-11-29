@@ -1542,7 +1542,6 @@ int cmd_status(int argc, const char **argv, const char *prefix)
 		usage_with_options(builtin_status_usage, builtin_status_options);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	status_init_config(&s, git_status_config);
 	argc = parse_options(argc, argv, prefix,
@@ -1711,7 +1710,6 @@ int cmd_commit(int argc, const char **argv, const char *prefix)
 		usage_with_options(builtin_commit_usage, builtin_commit_options);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	status_init_config(&s, git_commit_config);
 	s.commit_template = 1;

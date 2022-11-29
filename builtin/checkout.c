@@ -1668,7 +1668,6 @@ static int checkout_main(int argc, const char **argv, const char *prefix,
 	git_config(git_checkout_config, opts);
 	if (the_repository->gitdir) {
 		prepare_repo_settings(the_repository);
-		the_repository->settings.command_requires_full_index = 0;
 	}
 
 	opts->track = BRANCH_TRACK_UNSPECIFIED;

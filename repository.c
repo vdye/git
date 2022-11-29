@@ -8,6 +8,7 @@
 #include "repository.h"
 #include "object-store.h"
 #include "config.h"
+#include "environment.h"
 #include "object.h"
 #include "lockfile.h"
 #include "remote.h"
@@ -319,7 +320,7 @@ int repo_read_index(struct repository *repo)
 	res = read_index_from(repo->index, repo->index_file, repo->gitdir);
 
 	prepare_repo_settings(repo);
-	if (repo->settings.command_requires_full_index)
+	if (command_requires_full_index)
 		ensure_full_index(repo->index);
 
 	/*

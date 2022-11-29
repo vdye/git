@@ -435,7 +435,6 @@ int cmd_reset(int argc, const char **argv, const char *prefix)
 		die(_("the option '%s' requires '%s'"), "-N", "--mixed");
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	if (repo_read_index(the_repository) < 0)
 		die(_("index file corrupt"));

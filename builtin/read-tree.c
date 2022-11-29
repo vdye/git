@@ -180,7 +180,6 @@ int cmd_read_tree(int argc, const char **argv, const char *cmd_prefix)
 		opts.reset = UNPACK_RESET_OVERWRITE_UNTRACKED;
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	repo_hold_locked_index(the_repository, &lock_file, LOCK_DIE_ON_ERROR);
 

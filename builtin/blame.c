@@ -963,7 +963,6 @@ parse_done:
 	argc = parse_options_end(&ctx);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	if (incremental || (output_option & OUTPUT_PORCELAIN)) {
 		if (show_progress > 0)

@@ -3781,7 +3781,7 @@ int merge_recursive(struct merge_options *opt,
 	       !strcmp(opt->ancestor, "constructed merge base"));
 
 	prepare_repo_settings(opt->repo);
-	opt->repo->settings.command_requires_full_index = 1;
+	command_requires_full_index = 1;
 
 	if (merge_start(opt, repo_get_commit_tree(opt->repo, h1)))
 		return -1;

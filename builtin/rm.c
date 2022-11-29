@@ -295,7 +295,6 @@ int cmd_rm(int argc, const char **argv, const char *prefix)
 		setup_work_tree();
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 	repo_hold_locked_index(the_repository, &lock_file, LOCK_DIE_ON_ERROR);
 
 	if (repo_read_index(the_repository) < 0)

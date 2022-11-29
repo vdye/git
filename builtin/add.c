@@ -502,7 +502,6 @@ int cmd_add(int argc, const char **argv, const char *prefix)
 	require_pathspec = !(take_worktree_changes || (0 < addremove_explicit));
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	repo_hold_locked_index(the_repository, &lock_file, LOCK_DIE_ON_ERROR);
 

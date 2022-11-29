@@ -83,6 +83,14 @@ int precomposed_unicode = -1; /* see probe_utf8_pathname_composition() */
 unsigned long pack_size_limit_cfg;
 enum log_refs_config log_all_ref_updates = LOG_REFS_UNSET;
 
+/*
+ * This setting guards all index reads to require a full index
+ * over a sparse index. After suitable guards are placed in the
+ * codebase around uses of the index, this setting will be
+ * removed.
+ */
+int command_requires_full_index = 1;
+
 #ifndef PROTECT_HFS_DEFAULT
 #define PROTECT_HFS_DEFAULT 0
 #endif

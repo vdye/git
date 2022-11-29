@@ -1043,7 +1043,6 @@ int cmd_sparse_checkout(int argc, const char **argv, const char *prefix)
 	git_config(git_default_config, NULL);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	return fn(argc, argv, prefix);
 }

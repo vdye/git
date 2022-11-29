@@ -1197,7 +1197,6 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 				   builtin_rebase_options);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	git_config(rebase_config, &options);
 	/* options.gpg_sign_opt will be either "-S" or NULL */

@@ -742,7 +742,6 @@ int cmd_show(int argc, const char **argv, const char *prefix)
 
 	if (the_repository->gitdir) {
 		prepare_repo_settings(the_repository);
-		the_repository->settings.command_requires_full_index = 0;
 	}
 
 	memset(&match_all, 0, sizeof(match_all));

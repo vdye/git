@@ -741,7 +741,6 @@ int cmd_rev_parse(int argc, const char **argv, const char *prefix)
 			did_repo_setup = 1;
 
 			prepare_repo_settings(the_repository);
-			the_repository->settings.command_requires_full_index = 0;
 		}
 
 		if (!strcmp(arg, "--")) {

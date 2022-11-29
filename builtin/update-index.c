@@ -1116,7 +1116,6 @@ int cmd_update_index(int argc, const char **argv, const char *prefix)
 	git_config(git_default_config, NULL);
 
 	prepare_repo_settings(r);
-	the_repository->settings.command_requires_full_index = 0;
 
 	/* we will diagnose later if it turns out that we need to update it */
 	newfd = repo_hold_locked_index(the_repository, &lock_file, 0);

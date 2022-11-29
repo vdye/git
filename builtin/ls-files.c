@@ -779,7 +779,6 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 		usage_with_options(ls_files_usage, builtin_ls_files_options);
 
 	prepare_repo_settings(the_repository);
-	the_repository->settings.command_requires_full_index = 0;
 
 	prefix = cmd_prefix;
 	if (prefix)
