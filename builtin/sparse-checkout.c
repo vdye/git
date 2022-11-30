@@ -74,7 +74,7 @@ static int sparse_checkout_list(int argc, const char **argv, const char *prefix)
 
 	pl.use_cone_patterns = the_repository->settings.core_sparse_checkout_cone;
 
-	sparse_filename = get_sparse_checkout_filename();
+	sparse_filename = get_sparse_checkout_filename(the_repository);
 	res = add_patterns_from_file_to_list(sparse_filename, "", 0, &pl, NULL, 0);
 	free(sparse_filename);
 
@@ -326,7 +326,7 @@ static int write_patterns_and_update(struct pattern_list *pl)
 	struct lock_file lk = LOCK_INIT;
 	int result;
 
-	sparse_filename = get_sparse_checkout_filename();
+	sparse_filename = get_sparse_checkout_filename(the_repository);
 
 	if (safe_create_leading_directories(sparse_filename))
 		die(_("failed to create directory for sparse-checkout file"));
@@ -470,7 +470,7 @@ static int sparse_checkout_init(int argc, const char **argv, const char *prefix)
 
 	memset(&pl, 0, sizeof(pl));
 
-	sparse_filename = get_sparse_checkout_filename();
+	sparse_filename = get_sparse_checkout_filename(the_repository);
 	res = add_patterns_from_file_to_list(sparse_filename, "", 0, &pl, NULL, 0);
 
 	/* If we already have a sparse-checkout file, use it. */
@@ -615,7 +615,7 @@ static void add_patterns_cone_mode(int argc, const char **argv,
 	struct pattern_entry *pe;
 	struct hashmap_iter iter;
 	struct pattern_list existing;
-	char *sparse_filename = get_sparse_checkout_filename();
+	char *sparse_filename = get_sparse_checkout_filename(the_repository);
 
 	add_patterns_from_input(pl, argc, argv,
 				use_stdin ? stdin : NULL);
@@ -650,7 +650,7 @@ static void add_patterns_literal(int argc, const char **argv,
 				 struct pattern_list *pl,
 				 int use_stdin)
 {
-	char *sparse_filename = get_sparse_checkout_filename();
+	char *sparse_filename = get_sparse_checkout_filename(the_repository);
 	if (add_patterns_from_file_to_list(sparse_filename, "", 0,
 					   pl, NULL, 0))
 		die(_("unable to load existing sparse-checkout patterns"));
@@ -1003,13 +1003,13 @@ static int sparse_checkout_check_rules(int argc, const char **argv, const char *
 		check_rules_opts.cone_mode = 1;
 
 	update_cone_mode(&check_rules_opts.cone_mode);
-	pl.use_cone_patterns = core_sparse_checkout_cone;
+	pl.use_cone_patterns = the_repository->settings.core_sparse_checkout_cone;
 	if (check_rules_opts.rules_file) {
 		fp = xfopen(check_rules_opts.rules_file, "r");
 		add_patterns_from_input(&pl, argc, argv, fp);
 		fclose(fp);
 	} else {
-		sparse_filename = get_sparse_checkout_filename();
+		sparse_filename = get_sparse_checkout_filename(the_repository);
 		if (add_patterns_from_file_to_list(sparse_filename, "", 0, &pl,
 						   NULL, 0))
 			die(_("unable to load existing sparse-checkout patterns"));

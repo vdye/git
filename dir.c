@@ -1465,8 +1465,7 @@ int init_sparse_checkout_patterns(struct index_state *istate)
 
 	CALLOC_ARRAY(istate->sparse_checkout_patterns, 1);
 
-	if (get_sparse_checkout_patterns(istate->sparse_checkout_patterns,
-	    repo->settings.core_sparse_checkout_cone) < 0) {
+	if (get_sparse_checkout_patterns(repo, istate->sparse_checkout_patterns)) {
 		FREE_AND_NULL(istate->sparse_checkout_patterns);
 		return -1;
 	}
@@ -3372,17 +3371,17 @@ void setup_standard_excludes(struct dir_struct *dir)
 	}
 }
 
-char *get_sparse_checkout_filename(void)
+char *get_sparse_checkout_filename(const struct repository *r)
 {
-	return git_pathdup("info/sparse-checkout");
+	return repo_git_path(r, "info/sparse-checkout");
 }
 
-int get_sparse_checkout_patterns(struct pattern_list *pl, int use_cone_patterns)
+int get_sparse_checkout_patterns(const struct repository *r, struct pattern_list *pl)
 {
 	int res;
-	char *sparse_filename = get_sparse_checkout_filename();
+	char *sparse_filename = get_sparse_checkout_filename(r);
 
-	pl->use_cone_patterns = use_cone_patterns;
+	pl->use_cone_patterns = r->settings.core_sparse_checkout_cone;
 	res = add_patterns_from_file_to_list(sparse_filename, "", 0, pl, NULL, 0);
 
 	free(sparse_filename);

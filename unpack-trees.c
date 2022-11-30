@@ -1814,7 +1814,7 @@ static void mark_new_skip_worktree(struct pattern_list *pl,
 static void populate_from_existing_patterns(struct unpack_trees_options *o,
 					    struct pattern_list *pl)
 {
-	if (get_sparse_checkout_patterns(pl, o->src_index->repo->settings.core_sparse_checkout_cone) < 0)
+	if (get_sparse_checkout_patterns(o->src_index->repo, pl) < 0)
 		o->skip_sparse_checkout = 1;
 	else
 		o->internal.pl = pl;
