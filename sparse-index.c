@@ -438,12 +438,11 @@ void ensure_correct_sparsity(struct index_state *istate)
 		ensure_full_index(istate);
 }
 
-static int path_found(const char *path, const char **dirname, size_t *dir_len,
+static int path_found(const char *path, char **dirname, size_t *dir_len,
 		      int *dir_found)
 {
 	struct stat st;
 	char *newdir;
-	char *tmp;
 
 	/*
 	 * If dirname corresponds to a directory that doesn't exist, and this
@@ -475,29 +474,34 @@ static int path_found(const char *path, const char **dirname, size_t *dir_len,
 		return 0;
 
 	/* Free previous dirname, and cache path's dirname */
-	*dirname = path;
+	if (*dirname)
+		FREE_AND_NULL(*dirname);
 	*dir_len = newdir - path + 1;
-
-	tmp = xstrndup(path, *dir_len);
-	*dir_found = !lstat(tmp, &st);
-	free(tmp);
+	*dirname = xstrndup(path, *dir_len);
+	*dir_found = !lstat(*dirname, &st);
 
 	return 0;
 }
 
 void clear_skip_worktree_from_present_files(struct index_state *istate)
 {
-	const char *last_dirname = NULL;
+	char *last_dirname = NULL;
 	size_t dir_len = 0;
 	int dir_found = 1;
 
 	int i;
 	int path_count[2] = {0, 0};
 	int restarted = 0;
+	struct strbuf prefixed_ce_name = STRBUF_INIT;
+	int prefix_len;
 
 	if (!core_apply_sparse_checkout ||
 	    sparse_expect_files_outside_of_patterns)
 		return;
+
+	if (istate->repo->submodule_prefix)
+		strbuf_addstr(&prefixed_ce_name, istate->repo->submodule_prefix);
+	prefix_len = prefixed_ce_name.len;
 
 	trace2_region_enter("index", "clear_skip_worktree_from_present_files",
 			    istate->repo);
@@ -507,7 +511,11 @@ restart:
 
 		if (ce_skip_worktree(ce)) {
 			path_count[restarted]++;
-			if (path_found(ce->name, &last_dirname, &dir_len, &dir_found)) {
+
+			strbuf_setlen(&prefixed_ce_name, prefix_len);
+			strbuf_addstr(&prefixed_ce_name, ce->name);
+
+			if (path_found(prefixed_ce_name.buf, &last_dirname, &dir_len, &dir_found)) {
 				if (S_ISSPARSEDIR(ce->ce_mode)) {
 					if (restarted)
 						BUG("ensure-full-index did not fully flatten?");
@@ -528,6 +536,10 @@ restart:
 				   "sparse_path_count_full", path_count[1]);
 	trace2_region_leave("index", "clear_skip_worktree_from_present_files",
 			    istate->repo);
+
+	if (last_dirname)
+		FREE_AND_NULL(last_dirname);
+	strbuf_release(&prefixed_ce_name);
 }
 
 /*
