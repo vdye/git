@@ -681,7 +681,9 @@ static int git_sparse_checkout_init(const char *repo)
 	 * We must apply the setting in the current process
 	 * for the later checkout to use the sparse-checkout file.
 	 */
-	core_apply_sparse_checkout = 1;
+	/* TODO: does the_repository always exist at this point? */
+	prepare_repo_settings(the_repository);
+	the_repository->settings.core_apply_sparse_checkout = 1;
 
 	cmd.git_cmd = 1;
 	if (run_command(&cmd)) {

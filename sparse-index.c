@@ -128,7 +128,9 @@ static int index_has_unmerged_entries(struct index_state *istate)
 
 int is_sparse_index_allowed(struct index_state *istate, int flags)
 {
-	if (!core_apply_sparse_checkout || !core_sparse_checkout_cone)
+	prepare_repo_settings(istate->repo);
+	if (!istate->repo->settings.core_apply_sparse_checkout ||
+	    !istate->repo->settings.core_sparse_checkout_cone)
 		return 0;
 
 	if (!(flags & SPARSE_INDEX_MEMORY_ONLY)) {
@@ -495,7 +497,8 @@ void clear_skip_worktree_from_present_files(struct index_state *istate)
 	struct strbuf prefixed_ce_name = STRBUF_INIT;
 	int prefix_len;
 
-	if (!core_apply_sparse_checkout ||
+	prepare_repo_settings(istate->repo);
+	if (!istate->repo->settings.core_apply_sparse_checkout ||
 	    sparse_expect_files_outside_of_patterns)
 		return;
 

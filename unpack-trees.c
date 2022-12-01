@@ -1814,7 +1814,7 @@ static void mark_new_skip_worktree(struct pattern_list *pl,
 static void populate_from_existing_patterns(struct unpack_trees_options *o,
 					    struct pattern_list *pl)
 {
-	if (get_sparse_checkout_patterns(pl) < 0)
+	if (get_sparse_checkout_patterns(pl, o->src_index->repo->settings.core_sparse_checkout_cone) < 0)
 		o->skip_sparse_checkout = 1;
 	else
 		o->internal.pl = pl;
@@ -1909,7 +1909,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 	if (o->prefix)
 		update_sparsity_for_prefix(o->prefix, o->src_index);
 
-	if (!core_apply_sparse_checkout || !o->update)
+	if (!repo->settings.core_apply_sparse_checkout || !o->update)
 		o->skip_sparse_checkout = 1;
 	if (!o->skip_sparse_checkout) {
 		memset(&pl, 0, sizeof(pl));
@@ -1947,8 +1947,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 		xstrdup_or_null(o->src_index->fsmonitor_last_update);
 	o->internal.result.fsmonitor_has_run_once = o->src_index->fsmonitor_has_run_once;
 
-	if (!o->src_index->initialized &&
-	    !command_requires_full_index &&
+	if (!command_requires_full_index &&
 	    is_sparse_index_allowed(&o->internal.result, 0))
 		o->internal.result.sparse_index = 1;
 

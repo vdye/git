@@ -34,6 +34,8 @@ struct repo_settings {
 	int commit_graph_read_changed_paths;
 	int gc_write_commit_graph;
 	int fetch_write_commit_graph;
+	int core_apply_sparse_checkout;
+	int core_sparse_checkout_cone;
 	int sparse_index;
 	int pack_read_reverse_index;
 

@@ -483,7 +483,7 @@ void strip_dir_trailing_slashes(char *dir);
 void setup_standard_excludes(struct dir_struct *dir);
 
 char *get_sparse_checkout_filename(void);
-int get_sparse_checkout_patterns(struct pattern_list *pl);
+int get_sparse_checkout_patterns(struct pattern_list *pl, int use_cone_patterns);
 
 /* Constants for remove_dir_recursively: */
 

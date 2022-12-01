@@ -59,6 +59,10 @@ void prepare_repo_settings(struct repository *r)
 	/* Boolean config or default, does not cascade (simple)  */
 	repo_cfg_bool(r, "pack.usesparse", &r->settings.pack_use_sparse, 1);
 	repo_cfg_bool(r, "core.multipackindex", &r->settings.core_multi_pack_index, 1);
+	repo_cfg_bool(r, "core.sparsecheckout",
+		      &r->settings.core_apply_sparse_checkout, 0);
+	repo_cfg_bool(r, "core.sparsecheckoutcone",
+		      &r->settings.core_sparse_checkout_cone, 0);
 	repo_cfg_bool(r, "index.sparse", &r->settings.sparse_index, 0);
 	repo_cfg_bool(r, "index.skiphash", &r->settings.index_skip_hash, r->settings.index_skip_hash);
 	repo_cfg_bool(r, "pack.readreverseindex", &r->settings.pack_read_reverse_index, 1);

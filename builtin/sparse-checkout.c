@@ -63,7 +63,7 @@ static int sparse_checkout_list(int argc, const char **argv, const char *prefix)
 	int res;
 
 	setup_work_tree();
-	if (!core_apply_sparse_checkout)
+	if (!the_repository->settings.core_apply_sparse_checkout)
 		die(_("this worktree is not sparse"));
 
 	argc = parse_options(argc, argv, prefix,
@@ -72,7 +72,7 @@ static int sparse_checkout_list(int argc, const char **argv, const char *prefix)
 
 	memset(&pl, 0, sizeof(pl));
 
-	pl.use_cone_patterns = core_sparse_checkout_cone;
+	pl.use_cone_patterns = the_repository->settings.core_sparse_checkout_cone;
 
 	sparse_filename = get_sparse_checkout_filename();
 	res = add_patterns_from_file_to_list(sparse_filename, "", 0, &pl, NULL, 0);
@@ -345,7 +345,7 @@ static int write_patterns_and_update(struct pattern_list *pl)
 
 	fp = xfdopen(fd, "w");
 
-	if (core_sparse_checkout_cone)
+	if (the_repository->settings.core_sparse_checkout_cone)
 		write_cone_to_file(fp, pl);
 	else
 		write_patterns_to_file(fp, pl);
@@ -389,16 +389,16 @@ static int set_config(enum sparse_checkout_mode mode)
 
 static enum sparse_checkout_mode update_cone_mode(int *cone_mode) {
 	/* If not specified, use previous definition of cone mode */
-	if (*cone_mode == -1 && core_apply_sparse_checkout)
-		*cone_mode = core_sparse_checkout_cone;
+	if (*cone_mode == -1 && the_repository->settings.core_apply_sparse_checkout)
+		*cone_mode = the_repository->settings.core_sparse_checkout_cone;
 
 	/* Set cone/non-cone mode appropriately */
-	core_apply_sparse_checkout = 1;
+	the_repository->settings.core_apply_sparse_checkout = 1;
 	if (*cone_mode == 1 || *cone_mode == -1) {
-		core_sparse_checkout_cone = 1;
+		the_repository->settings.core_sparse_checkout_cone = 1;
 		return MODE_CONE_PATTERNS;
 	}
-	core_sparse_checkout_cone = 0;
+	the_repository->settings.core_sparse_checkout_cone = 0;
 	return MODE_ALL_PATTERNS;
 }
 
@@ -407,7 +407,7 @@ static int update_modes(int *cone_mode, int *sparse_index)
 	int mode, record_mode;
 
 	/* Determine if we need to record the mode; ensure sparse checkout on */
-	record_mode = (*cone_mode != -1) || !core_apply_sparse_checkout;
+	record_mode = (*cone_mode != -1) || !the_repository->settings.core_apply_sparse_checkout;
 
 	mode = update_cone_mode(cone_mode);
 	if (record_mode && set_config(mode))
@@ -556,7 +556,7 @@ static void add_patterns_from_input(struct pattern_list *pl,
 				    FILE *file)
 {
 	int i;
-	if (core_sparse_checkout_cone) {
+	if (the_repository->settings.core_sparse_checkout_cone) {
 		struct strbuf line = STRBUF_INIT;
 
 		hashmap_init(&pl->recursive_hashmap, pl_hashmap_cmp, NULL, 0);
@@ -621,7 +621,7 @@ static void add_patterns_cone_mode(int argc, const char **argv,
 				use_stdin ? stdin : NULL);
 
 	memset(&existing, 0, sizeof(existing));
-	existing.use_cone_patterns = core_sparse_checkout_cone;
+	existing.use_cone_patterns = the_repository->settings.core_sparse_checkout_cone;
 
 	if (add_patterns_from_file_to_list(sparse_filename, "", 0,
 					   &existing, NULL, 0))
@@ -667,7 +667,7 @@ static int modify_pattern_list(int argc, const char **argv, int use_stdin,
 
 	switch (m) {
 	case ADD:
-		if (core_sparse_checkout_cone)
+		if (the_repository->settings.core_sparse_checkout_cone)
 			add_patterns_cone_mode(argc, argv, pl, use_stdin);
 		else
 			add_patterns_literal(argc, argv, pl, use_stdin);
@@ -679,9 +679,9 @@ static int modify_pattern_list(int argc, const char **argv, int use_stdin,
 		break;
 	}
 
-	if (!core_apply_sparse_checkout) {
+	if (!the_repository->settings.core_apply_sparse_checkout) {
 		set_config(MODE_ALL_PATTERNS);
-		core_apply_sparse_checkout = 1;
+		the_repository->settings.core_apply_sparse_checkout = 1;
 		changed_config = 1;
 	}
 
@@ -703,7 +703,7 @@ static void sanitize_paths(int argc, const char **argv,
 	if (!argc)
 		return;
 
-	if (prefix && *prefix && core_sparse_checkout_cone) {
+	if (prefix && *prefix && the_repository->settings.core_sparse_checkout_cone) {
 		/*
 		 * The args are not pathspecs, so unfortunately we
 		 * cannot imitate how cmd_add() uses parse_pathspec().
@@ -717,10 +717,10 @@ static void sanitize_paths(int argc, const char **argv,
 	if (skip_checks)
 		return;
 
-	if (prefix && *prefix && !core_sparse_checkout_cone)
+	if (prefix && *prefix && !the_repository->settings.core_sparse_checkout_cone)
 		die(_("please run from the toplevel directory in non-cone mode"));
 
-	if (core_sparse_checkout_cone) {
+	if (the_repository->settings.core_sparse_checkout_cone) {
 		for (i = 0; i < argc; i++) {
 			if (argv[i][0] == '/')
 				die(_("specify directories rather than patterns (no leading slash)"));
@@ -742,7 +742,7 @@ static void sanitize_paths(int argc, const char **argv,
 		if (S_ISSPARSEDIR(ce->ce_mode))
 			continue;
 
-		if (core_sparse_checkout_cone)
+		if (the_repository->settings.core_sparse_checkout_cone)
 			die(_("'%s' is not a directory; to treat it as a directory anyway, rerun with --skip-checks"), argv[i]);
 		else
 			warning(_("pass a leading slash before paths such as '%s' if you want a single file (see NON-CONE PROBLEMS in the git-sparse-checkout manual)."), argv[i]);
@@ -771,7 +771,7 @@ static int sparse_checkout_add(int argc, const char **argv, const char *prefix)
 	};
 
 	setup_work_tree();
-	if (!core_apply_sparse_checkout)
+	if (!the_repository->settings.core_apply_sparse_checkout)
 		die(_("no sparse-checkout to add to"));
 
 	repo_read_index(the_repository);
@@ -836,7 +836,7 @@ static int sparse_checkout_set(int argc, const char **argv, const char *prefix)
 	 * non-cone mode, if nothing is specified, manually select just the
 	 * top-level directory (much as 'init' would do).
 	 */
-	if (!core_sparse_checkout_cone && argc == 0) {
+	if (!the_repository->settings.core_sparse_checkout_cone && argc == 0) {
 		argv = default_patterns;
 		argc = default_patterns_nr;
 	} else {
@@ -868,7 +868,7 @@ static int sparse_checkout_reapply(int argc, const char **argv,
 	};
 
 	setup_work_tree();
-	if (!core_apply_sparse_checkout)
+	if (!the_repository->settings.core_apply_sparse_checkout)
 		die(_("must be in a sparse-checkout to reapply sparsity patterns"));
 
 	reapply_opts.cone_mode = -1;
@@ -922,12 +922,11 @@ static int sparse_checkout_disable(int argc, const char **argv,
 	hashmap_init(&pl.recursive_hashmap, pl_hashmap_cmp, NULL, 0);
 	hashmap_init(&pl.parent_hashmap, pl_hashmap_cmp, NULL, 0);
 	pl.use_cone_patterns = 0;
-	core_apply_sparse_checkout = 1;
 
 	strbuf_addstr(&match_all, "/*");
 	add_pattern(strbuf_detach(&match_all, NULL), empty_base, 0, &pl, 0);
 
-	prepare_repo_settings(the_repository);
+	the_repository->settings.core_apply_sparse_checkout = 1;
 	the_repository->settings.sparse_index = 0;
 
 	if (update_working_directory(&pl))
