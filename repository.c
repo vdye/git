@@ -26,6 +26,7 @@ struct index_state the_index;
 void initialize_the_repository(void)
 {
 	the_repository = &the_repo;
+	the_index.repo = &the_repo;
 
 	the_repo.index = &the_index;
 	the_repo.objects = raw_object_store_new();
