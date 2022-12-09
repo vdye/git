@@ -383,6 +383,16 @@ struct merge_options_internal {
 	struct index_state attr_index;
 
 	/*
+	 * orig_index: the original index reference associated with opt->repo
+	 *
+	 * If attr_index is used, it needs to be associated with opt->repo so
+	 * that it can properly utilize the initialized repo_settings. This
+	 * index_state pointer holds the original opt->repo index so that it
+	 * can be restored after the merge is complete.
+	 */
+	struct index_state *orig_index;
+
+	/*
 	 * current_dir_name, toplevel_dir: temporary vars
 	 *
 	 * These are used in collect_merge_info_callback(), and will set the
@@ -634,6 +644,7 @@ static void free_strmap_strings(struct strmap *map)
 }
 
 static void clear_or_reinit_internal_opts(struct merge_options_internal *opti,
+					  struct repository *repo,
 					  int reinitialize)
 {
 	struct rename_info *renames = &opti->renames;
@@ -654,8 +665,15 @@ static void clear_or_reinit_internal_opts(struct merge_options_internal *opti,
 	 */
 	strmap_clear_func(&opti->conflicted, 0);
 
-	if (opti->attr_index.cache_nr) /* true iff opt->renormalize */
+	/*
+	 * Restore the original index reference in the provided repo if it was
+	 * replaced during the merge. Then, discard attr_index.
+	 */
+	if (opti->attr_index.initialized) { /* true iff opt->renormalize */
+		repo->index = opti->orig_index;
+		opti->orig_index = NULL;
 		discard_index(&opti->attr_index);
+	}
 
 	/* Free memory used by various renames maps */
 	for (i = MERGE_SIDE1; i <= MERGE_SIDE2; ++i) {
@@ -1917,6 +1935,17 @@ static void initialize_attr_index(struct merge_options *opt)
 	struct cache_entry *ce;
 
 	attr_index->initialized = 1;
+
+	/*
+	 * Associate the initialized repo with the attr_index. To avoid
+	 * running afoul of the BUG added in 1fd9ae517c4 (repository: add
+	 * repo reference to index_state, 2021-01-23), store the original
+	 * index reference for restoration in 'merge_finalize()'.
+	 */
+	if (opt->priv->orig_index)
+		BUG("orig_index is already populated, cannot save reference");
+	opt->priv->orig_index = opt->repo->index;
+	attr_index->repo = opt->repo;
 
 	if (!opt->renormalize)
 		return;
@@ -4728,7 +4757,7 @@ void merge_finalize(struct merge_options *opt,
 	assert(opt->priv == NULL);
 
 	if (result->priv) {
-		clear_or_reinit_internal_opts(result->priv, 0);
+		clear_or_reinit_internal_opts(result->priv, opt->repo, 0);
 		FREE_AND_NULL(result->priv);
 	}
 }
@@ -4834,7 +4863,7 @@ static void merge_start(struct merge_options *opt, struct merge_result *result)
 	/* Initialization of opt->priv, our internal merge data */
 	trace2_region_enter("merge", "allocate/init", opt->repo);
 	if (opt->priv) {
-		clear_or_reinit_internal_opts(opt->priv, 1);
+		clear_or_reinit_internal_opts(opt->priv, opt->repo, 1);
 		string_list_init_nodup(&opt->priv->conflicted_submodules);
 		trace2_region_leave("merge", "allocate/init", opt->repo);
 		return;
@@ -4985,7 +5014,7 @@ redo:
 	trace2_region_leave("merge", "renames", opt->repo);
 	if (opt->priv->renames.redo_after_renames == 2) {
 		trace2_region_enter("merge", "reset_maps", opt->repo);
-		clear_or_reinit_internal_opts(opt->priv, 1);
+		clear_or_reinit_internal_opts(opt->priv, opt->repo, 1);
 		trace2_region_leave("merge", "reset_maps", opt->repo);
 		goto redo;
 	}
@@ -5079,7 +5108,7 @@ static void merge_ort_internal(struct merge_options *opt,
 		commit_list_insert(prev, &merged_merge_bases->parents);
 		commit_list_insert(next, &merged_merge_bases->parents->next);
 
-		clear_or_reinit_internal_opts(opt->priv, 1);
+		clear_or_reinit_internal_opts(opt->priv, opt->repo, 1);
 	}
 
 	opt->ancestor = ancestor_name;
