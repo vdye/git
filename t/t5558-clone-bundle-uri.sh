@@ -465,6 +465,65 @@ test_expect_success 'http clone with bundle.heuristic creates fetch.bundleURI' '
 	cat >expect <<-\EOF &&
 	refs/bundles/base
 	EOF
+	test_cmp expect refs &&
+
+	cat >>"$HTTPD_DOCUMENT_ROOT_PATH/bundle-list" <<-EOF &&
+	[bundle "bundle-2"]
+		uri = bundle-2.bundle
+		creationToken = 2
+	EOF
+
+	# Fetch the objects for bundle-2 _and_ bundle-3.
+	GIT_TRACE2_EVENT="$(pwd)/trace1.txt" \
+		git -C fetch-http-4 fetch origin --no-tags \
+		refs/heads/left:refs/heads/left \
+		refs/heads/right:refs/heads/right &&
+
+	# This fetch should copy two files: the list and bundle-2.
+	test_bundle_downloaded bundle-list trace1.txt &&
+	test_bundle_downloaded bundle-2.bundle trace1.txt &&
+	! test_bundle_downloaded bundle-1.bundle trace1.txt &&
+
+	# received left from bundle-2
+	git -C fetch-http-4 for-each-ref --format="%(refname)" "refs/bundles/*" >refs &&
+	cat >expect <<-\EOF &&
+	refs/bundles/base
+	refs/bundles/left
+	EOF
+	test_cmp expect refs &&
+
+	cat >>"$HTTPD_DOCUMENT_ROOT_PATH/bundle-list" <<-EOF &&
+	[bundle "bundle-3"]
+		uri = bundle-3.bundle
+		creationToken = 3
+
+	[bundle "bundle-4"]
+		uri = bundle-4.bundle
+		creationToken = 4
+	EOF
+
+	# This fetch should skip bundle-3.bundle, since its objets are
+	# already local (we have the requisite commits for bundle-4.bundle).
+	GIT_TRACE2_EVENT="$(pwd)/trace2.txt" \
+		git -C fetch-http-4 fetch origin --no-tags \
+		refs/heads/merge:refs/heads/merge &&
+
+	# This fetch should copy three files: the list, bundle-3, and bundle-4.
+	test_bundle_downloaded bundle-list trace2.txt &&
+	test_bundle_downloaded bundle-4.bundle trace2.txt &&
+	! test_bundle_downloaded bundle-1.bundle trace2.txt &&
+	! test_bundle_downloaded bundle-2.bundle trace2.txt &&
+	! test_bundle_downloaded bundle-3.bundle trace2.txt &&
+
+	# received merge ref from bundle-4, but right is missing
+	# because we did not download bundle-3.
+	git -C fetch-http-4 for-each-ref --format="%(refname)" "refs/bundles/*" >refs &&
+
+	cat >expect <<-\EOF &&
+	refs/bundles/base
+	refs/bundles/left
+	refs/bundles/merge
+	EOF
 	test_cmp expect refs
 '
 
