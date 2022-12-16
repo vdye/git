@@ -435,6 +435,39 @@ test_expect_success 'clone bundle list (http, creationToken)' '
 	test_bundle_downloaded bundle-2.bundle trace-clone.txt
 '
 
+test_expect_success 'http clone with bundle.heuristic creates fetch.bundleURI' '
+	test_when_finished rm -rf fetch-http-4 trace*.txt &&
+
+	cat >"$HTTPD_DOCUMENT_ROOT_PATH/bundle-list" <<-EOF &&
+	[bundle]
+		version = 1
+		mode = all
+		heuristic = creationToken
+
+	[bundle "bundle-1"]
+		uri = bundle-1.bundle
+		creationToken = 1
+	EOF
+
+	GIT_TRACE2_EVENT="$(pwd)/trace-clone.txt" \
+	git clone --single-branch --branch=base \
+		--bundle-uri="$HTTPD_URL/bundle-list" \
+		"$HTTPD_URL/smart/fetch.git" fetch-http-4 &&
+
+	test_cmp_config -C fetch-http-4 "$HTTPD_URL/bundle-list" fetch.bundleuri &&
+
+	# The clone should copy two files: the list and bundle-1.
+	test_bundle_downloaded bundle-list trace-clone.txt &&
+	test_bundle_downloaded bundle-1.bundle trace-clone.txt &&
+
+	# only received base ref from bundle-1
+	git -C fetch-http-4 for-each-ref --format="%(refname)" "refs/bundles/*" >refs &&
+	cat >expect <<-\EOF &&
+	refs/bundles/base
+	EOF
+	test_cmp expect refs
+'
+
 # Do not add tests here unless they use the HTTP server, as they will
 # not run unless the HTTP dependencies exist.
 

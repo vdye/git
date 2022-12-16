@@ -594,9 +594,10 @@ static int fetch_bundle_list_in_config_format(struct repository *r,
 	 * it advertises are expected to be bundles, not nested lists.
 	 * We can drop 'global_list' and 'depth'.
 	 */
-	if (list_from_bundle.heuristic == BUNDLE_HEURISTIC_CREATIONTOKEN)
+	if (list_from_bundle.heuristic == BUNDLE_HEURISTIC_CREATIONTOKEN) {
 		result = fetch_bundles_by_token(r, &list_from_bundle);
-	else if ((result = download_bundle_list(r, &list_from_bundle,
+		global_list->heuristic = BUNDLE_HEURISTIC_CREATIONTOKEN;
+	} else if ((result = download_bundle_list(r, &list_from_bundle,
 					   global_list, depth)))
 		goto cleanup;
 
@@ -707,7 +708,8 @@ static int unlink_bundle(struct remote_bundle_info *info, void *data)
 	return 0;
 }
 
-int fetch_bundle_uri(struct repository *r, const char *uri)
+int fetch_bundle_uri(struct repository *r, const char *uri,
+		     int *has_heuristic)
 {
 	int result;
 	struct bundle_list list;
@@ -727,6 +729,8 @@ int fetch_bundle_uri(struct repository *r, const char *uri)
 	result = unbundle_all_bundles(r, &list);
 
 cleanup:
+	if (has_heuristic)
+		*has_heuristic = (list.heuristic != BUNDLE_HEURISTIC_NONE);
 	for_all_bundles_in_list(&list, unlink_bundle, NULL);
 	clear_bundle_list(&list);
 	clear_remote_bundle_info(&bundle, NULL);
