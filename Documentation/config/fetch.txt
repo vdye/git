@@ -104,3 +104,11 @@ fetch.bundleURI::
 	first running `git fetch --bundle-uri=<uri>` immediately before
 	`git fetch <args>`. See details of the `--bundle-uri` option in
 	linkgit:git-fetch[1].
+
+fetch.bundleCreationToken::
+	When using `fetch.bundleURI` to fetch incrementally from a bundle
+	list that uses the "creationToken" heuristic, this config value
+	stores the maximum `creationToken` value of the downloaded bundles.
+	This value is used to prevent downloading bundles in the future
+	if the advertised `creationToken` is not strictly larger than this
+	value.

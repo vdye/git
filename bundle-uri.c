@@ -464,6 +464,8 @@ static int fetch_bundles_by_token(struct repository *r,
 {
 	int cur;
 	int pop_or_push = 0;
+	const char *creationTokenStr;
+	uint64_t maxCreationToken;
 	struct bundle_list_context ctx = {
 		.r = r,
 		.list = list,
@@ -477,7 +479,26 @@ static int fetch_bundles_by_token(struct repository *r,
 
 	for_all_bundles_in_list(list, insert_bundle, &sorted);
 
+	if (!sorted.nr) {
+		free(sorted.items);
+		return 0;
+	}
+
 	QSORT(sorted.items, sorted.nr, compare_creation_token);
+
+	/*
+	 * If fetch.bundleCreationToken exists, parses to a uint64t, and
+	 * is not strictly smaller than the maximum creation token in the
+	 * bundle list, then do not download any bundles.
+	 */
+	if (!repo_config_get_value(r,
+				   "fetch.bundlecreationtoken",
+				   &creationTokenStr) &&
+	    sscanf(creationTokenStr, "%"PRIu64, &maxCreationToken) == 1 &&
+	    sorted.items[0]->creationToken <= maxCreationToken) {
+		free(sorted.items);
+		return 0;
+	}
 
 	/*
 	 * Use a stack-based approach to download the bundles and attempt
@@ -541,14 +562,24 @@ stack_operation:
 		cur += pop_or_push;
 	}
 
-	free(sorted.items);
-
 	/*
 	 * We succeed if the loop terminates because 'cur' drops below
 	 * zero. The other case is that we terminate because 'cur'
 	 * reaches the end of the list, so we have a failure no matter
 	 * which bundles we apply from the list.
 	 */
+	if (cur < 0) {
+		struct strbuf value = STRBUF_INIT;
+		strbuf_addf(&value, "%"PRIu64"", sorted.items[0]->creationToken);
+		if (repo_config_set_multivar_gently(ctx.r,
+						    "fetch.bundleCreationToken",
+						    value.buf, NULL, 0))
+			warning(_("failed to store maximum creation token"));
+
+		strbuf_release(&value);
+	}
+
+	free(sorted.items);
 	return cur >= 0;
 }
 
