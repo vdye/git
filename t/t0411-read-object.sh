@@ -13,7 +13,10 @@ test_expect_success 'blobs can be retrieved from the host repo' '
 	git init guest-repo &&
 	(cd guest-repo &&
 	 mkdir -p .git/hooks &&
-	 cp $TEST_DIRECTORY/t0410/read-object .git/hooks/ &&
+	 sed "1s|/usr/bin/perl|$PERL_PATH|" \
+	   <$TEST_DIRECTORY/t0410/read-object \
+	   >.git/hooks/read-object &&
+	 chmod +x .git/hooks/read-object &&
 	 git config core.virtualizeobjects true &&
 	 git cat-file blob "$hash1")
 '
