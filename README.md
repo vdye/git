@@ -114,13 +114,12 @@ Or you can run the `git update-microsoft-git` command, which will run those brew
 ## Linux
 ### Ubuntu/Debian distributions
 
-On newer distributions*, you may use the most recent
-[Debian package](https://github.com/microsoft/git/releases). For
-example, you can download a specific version as follows:
+On newer distributions*, you can download the most recent Debian package from
+the [releases page](https://github.com/microsoft/git/releases/latest) (or
+using a tool such as `wget`) then run:
 
 ```shell
-wget -O microsoft-git.deb https://github.com/microsoft/git/releases/download/v2.33.0.vfs.0.0/microsoft-git_2.33.0.vfs.0.0.deb
-sudo dpkg -i microsoft-git.deb
+sudo dpkg -i <path to package>
 ```
 
 Double-check that you have the right version by running these commands,
