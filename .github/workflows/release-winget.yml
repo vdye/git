@@ -3,6 +3,13 @@ on:
   release:
     types: [released]
 
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Release Id'
+        required: true
+        default: 'latest'
+
 jobs:
   release:
     runs-on: windows-latest
@@ -17,7 +24,17 @@ jobs:
           $github.release.tag_name -match '\d.*'
           $version = $Matches[0] -replace ".vfs",""
 
-          # Download and run wingetcreate
+          # Download wingetcreate and create manifests
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          .\wingetcreate.exe update Microsoft.Git -u $asset.browser_download_url -v $version -o manifests -t "${{ secrets.WINGET_TOKEN }}" -s
+          .\wingetcreate.exe update Microsoft.Git -u $asset.browser_download_url -v $version -o manifests
+
+          # Manually substitute the name of the default branch in the License
+          # and Copyright URLs since the tooling cannot do that for us.
+          $shortenedVersion = $version -replace ".{4}$"
+          $manifestPath = dir -Path ./manifests -Filter Microsoft.Git.locale.en-US.yaml -Recurse | %{$_.FullName}
+          sed -i "s/vfs-[.0-9]*/vfs-$shortenedVersion/g" "$manifestPath"
+
+          # Submit manifests
+          $manifestDirectory = Split-Path "$manifestPath"
+          .\wingetcreate.exe submit -t "${{ secrets.WINGET_TOKEN }}" $manifestDirectory
         shell: powershell
