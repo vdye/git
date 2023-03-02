@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Check out Git's source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup build tools on Windows
         if: runner.os == 'Windows'
@@ -118,7 +118,7 @@ jobs:
           case "$(scalar version 2>&1)" in *.vfs.*) echo Good;; *) exit 1;; esac
 
       - name: Check out Scalar's source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Indicate full history so Nerdbank.GitVersioning works.
           path: scalar
