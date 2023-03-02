@@ -19,8 +19,8 @@ jobs:
     steps:
       - name: Determine tag to build
         run: |
-          echo "::set-output name=name::${GITHUB_REF#refs/tags/}"
-          echo "::set-output name=version::${GITHUB_REF#refs/tags/v}"
+          echo "name=${GITHUB_REF#refs/tags/}" >>$GITHUB_OUTPUT
+          echo "version=${GITHUB_REF#refs/tags/v}" >>$GITHUB_OUTPUT
         id: tag
       - name: Determine whether signing certificates are present
         run: echo "::set-output name=signable::$([[ $AZ_SUB != '' && $AZ_CREDS != '' ]] && echo 'true' || echo 'false')"
