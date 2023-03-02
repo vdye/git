@@ -23,7 +23,7 @@ jobs:
           echo "version=${GITHUB_REF#refs/tags/v}" >>$GITHUB_OUTPUT
         id: tag
       - name: Determine whether signing certificates are present
-        run: echo "::set-output name=signable::$([[ $AZ_SUB != '' && $AZ_CREDS != '' ]] && echo 'true' || echo 'false')"
+        run: echo "signable=$([[ $AZ_SUB != '' && $AZ_CREDS != '' ]] && echo 'true' || echo 'false')" >>$GITHUB_OUTPUT
         id: deb
       - name: Clone git
         uses: actions/checkout@v2
