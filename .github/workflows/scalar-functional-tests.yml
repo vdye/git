@@ -126,7 +126,7 @@ jobs:
           ref: ${{ env.SCALAR_REF }}
 
       - name: Setup .NET Core
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v3
         with:
           dotnet-version: 3.1.302
 
