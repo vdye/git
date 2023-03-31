@@ -49,12 +49,7 @@ test_expect_success 'setup' '
 	)
 '
 
-# NEEDSWORK: when running `grep` in the superproject with --recurse-submodules,
-# Git expands the index of the submodules unexpectedly. Even though `grep`
-# builtin is marked as "command_requires_full_index = 0", this config is only
-# useful for the superproject. Namely, the submodules have their own configs,
-# which are _not_ populated by the one-time sparse-index feature switch.
-test_expect_failure 'grep within submodules is not expanded' '
+test_expect_success 'grep within submodules is not expanded' '
 (
 	init_repos &&
 
@@ -68,12 +63,6 @@ test_expect_failure 'grep within submodules is not expanded' '
 )
 '
 
-# NEEDSWORK: this test is not actually testing the code. The design purpose
-# of this test is to verify the grep result when the submodules are using a
-# sparse-index. Namely, we want "folder2/" as a tree (a sparse directory); but
-# because of the index expansion, we are now grepping the "folder2/a" blob.
-# Because of the problem stated above 'grep within submodules is not expanded',
-# we don't have the ideal test environment yet.
 test_expect_success 'grep sparse directory within submodules' '
 (
 	init_repos &&
@@ -92,7 +81,7 @@ test_expect_success 'grep sparse directory within submodules' '
 )
 '
 
-test_expect_failure 'ls-files: sparse index super project, sparse index submodule' '
+test_expect_success 'ls-files: sparse index super project, sparse index submodule' '
 (
 	init_repos &&
 
@@ -109,7 +98,7 @@ test_expect_failure 'ls-files: sparse index super project, sparse index submodul
 )
 '
 
-test_expect_failure 'ls-files: sparse-checkout super project, sparse index submodule' '
+test_expect_success 'ls-files: sparse-checkout super project, sparse index submodule' '
 (
 	init_repos &&
 
@@ -126,7 +115,7 @@ test_expect_failure 'ls-files: sparse-checkout super project, sparse index submo
 )
 '
 
-test_expect_failure 'ls-files: non-sparse super project, sparse index submodule' '
+test_expect_success 'ls-files: non-sparse super project, sparse index submodule' '
 (
 	init_repos &&
 	git -C sub1 sparse-checkout set --sparse-index deep &&
@@ -186,7 +175,7 @@ test_expect_success 'file cannot be added inside SKIP_WORKTREE submodule' '
 )
 '
 
-test_expect_failure 'SKIP_WORKTREE cleared within submodules' '
+test_expect_success 'SKIP_WORKTREE cleared within submodules' '
 (
 	init_repos &&
 	git -C sub1 sparse-checkout set deep &&
