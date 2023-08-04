@@ -33,4 +33,10 @@ void write_file(const char *path, const char *fmt, ...);
 /* Return 1 if the file is empty or does not exists, 0 otherwise. */
 int is_empty_or_missing_file(const char *filename);
 
+/*
+ * Returns a random uint32_t, uniformly distributed across all possible
+ * values.
+ */
+uint32_t git_rand(void);
+
 #endif /* WRAPPER_H */
