@@ -2345,12 +2345,17 @@ static void install_prefetch(struct gh__request_params *params,
 		trace2_data_intmax(TR2_CAT, NULL,
 				   "prefetch/packfile_count", np);
 
+	if (gh__cmd_opts.show_progress)
+		params->progress = start_progress("Installing prefetch packfiles", np);
+
 	for (k = 0; k < np; k++) {
 		extract_packfile_from_multipack(params, status, fd, k);
+		display_progress(params->progress, k + 1);
 		if (status->ec != GH__ERROR_CODE__OK)
 			break;
 		nr_installed++;
 	}
+	stop_progress(&params->progress);
 
 	if (nr_installed)
 		delete_stale_keep_files(params, status);
