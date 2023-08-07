@@ -1855,13 +1855,8 @@ static void my_run_index_pack(struct gh__request_params *params,
 	strvec_push(&ip.args, "git");
 	strvec_push(&ip.args, "index-pack");
 
-	if (gh__cmd_opts.show_progress) {
-		strvec_push(&ip.args, "-v");
-		ip.err = 0;
-	} else {
-		ip.err = -1;
-		ip.no_stderr = 1;
-	}
+	ip.err = -1;
+	ip.no_stderr = 1;
 
 	/* Skip generating the rev index, we don't need it. */
 	strvec_push(&ip.args, "--no-rev-index");
