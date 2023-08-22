@@ -1403,7 +1403,7 @@ int cmd_main(int argc, const char **argv)
 	if (is_unattended()) {
 		setenv("GIT_ASKPASS", "", 0);
 		setenv("GIT_TERMINAL_PROMPT", "false", 0);
-		git_config_push_parameter("credential.interactive=never");
+		git_config_push_parameter("credential.interactive=false");
 	}
 
 	while (argc > 1 && *argv[1] == '-') {
