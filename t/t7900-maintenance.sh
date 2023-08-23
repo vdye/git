@@ -54,23 +54,6 @@ test_expect_success 'run [--auto|--quiet]' '
 	test_subcommand git gc --no-quiet <run-no-quiet.txt
 '
 
-test_expect_success 'lock file behavior' '
-	test_when_finished git config --unset maintenance.commit-graph.schedule &&
-	git config maintenance.commit-graph.schedule hourly &&
-
-	touch .git/objects/maintenance.lock &&
-	git maintenance run --schedule=hourly --no-quiet 2>err &&
-	grep "lock file .* exists, skipping maintenance" err &&
-
-	test-tool chmtime =-22000 .git/objects/maintenance.lock &&
-	git maintenance run --schedule=hourly --no-quiet 2>err &&
-	grep "deleted stale lock file" err &&
-	test_path_is_missing .git/objects/maintenance.lock &&
-
-	git maintenance run --schedule=hourly 2>err &&
-	test_must_be_empty err
-'
-
 test_expect_success 'maintenance.auto config option' '
 	GIT_TRACE2_EVENT="$(pwd)/default" git commit --quiet --allow-empty -m 1 &&
 	test_subcommand git maintenance run --auto --quiet <default &&
@@ -770,6 +753,9 @@ test_expect_success 'start and stop Linux/systemd maintenance' '
 	test_systemd_analyze_verify "systemd/user/git-maintenance@hourly.service" &&
 	test_systemd_analyze_verify "systemd/user/git-maintenance@daily.service" &&
 	test_systemd_analyze_verify "systemd/user/git-maintenance@weekly.service" &&
+
+	grep "core.askPass=true" "systemd/user/git-maintenance@.service" &&
+	grep "credential.interactive=false" "systemd/user/git-maintenance@.service" &&
 
 	printf -- "--user enable --now git-maintenance@%s.timer\n" hourly daily weekly >expect &&
 	test_cmp expect args &&

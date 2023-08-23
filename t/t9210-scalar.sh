@@ -176,8 +176,11 @@ test_expect_success 'scalar reconfigure' '
 	scalar reconfigure one &&
 	test true = "$(git -C one/src config core.preloadIndex)" &&
 	git -C one/src config core.preloadIndex false &&
-	scalar reconfigure -a &&
-	test true = "$(git -C one/src config core.preloadIndex)"
+	rm one/src/cron.txt &&
+	GIT_TRACE2_EVENT="$(pwd)/reconfigure" scalar reconfigure -a &&
+	test_path_is_file one/src/cron.txt &&
+	test true = "$(git -C one/src config core.preloadIndex)" &&
+	test_subcommand git maintenance start <reconfigure
 '
 
 test_expect_success '`reconfigure -a` removes stale config entries' '
@@ -300,7 +303,11 @@ test_expect_success 'start GVFS-enabled server' '
 test_expect_success '`scalar clone` with GVFS-enabled server' '
 	: the fake cache server requires fake authentication &&
 	git config --global core.askPass true &&
-	scalar clone --single-branch -- http://$HOST_PORT/ using-gvfs &&
+
+	# We must set credential.interactive=true to bypass a setting
+	# in "scalar clone" that disables interactive credentials during
+	# an unattended command.
+	scalar -c credential.interactive=true clone --single-branch -- http://$HOST_PORT/ using-gvfs &&
 
 	: verify that the shared cache has been configured &&
 	cache_key="url_$(printf "%s" http://$HOST_PORT/ |

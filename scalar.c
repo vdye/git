@@ -1098,6 +1098,9 @@ static int cmd_reconfigure(int argc, const char **argv)
 		if (set_recommended_config(1) < 0)
 			failed = -1;
 
+		if (toggle_maintenance(1) < 0)
+			failed = -1;
+
 loop_end:
 		if (failed) {
 			res = failed;
@@ -1400,7 +1403,7 @@ int cmd_main(int argc, const char **argv)
 	if (is_unattended()) {
 		setenv("GIT_ASKPASS", "", 0);
 		setenv("GIT_TERMINAL_PROMPT", "false", 0);
-		git_config_push_parameter("credential.interactive=never");
+		git_config_push_parameter("credential.interactive=false");
 	}
 
 	while (argc > 1 && *argv[1] == '-') {

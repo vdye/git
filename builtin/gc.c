@@ -1309,8 +1309,6 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 	char *lock_path = xstrfmt("%s/maintenance", r->objects->odb->path);
 
 	if (hold_lock_file_for_update(&lk, lock_path, LOCK_NO_DEREF) < 0) {
-		struct stat st;
-		struct strbuf lock_dot_lock = STRBUF_INIT;
 		/*
 		 * Another maintenance command is running.
 		 *
@@ -1321,25 +1319,6 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts)
 		if (!opts->auto_flag && !opts->quiet)
 			warning(_("lock file '%s' exists, skipping maintenance"),
 				lock_path);
-
-		/*
-		 * Check timestamp on .lock file to see if we should
-		 * delete it to recover from a fail state.
-		 */
-		strbuf_addstr(&lock_dot_lock, lock_path);
-		strbuf_addstr(&lock_dot_lock, ".lock");
-		if (lstat(lock_dot_lock.buf, &st))
-			warning_errno(_("unable to stat '%s'"), lock_dot_lock.buf);
-		else {
-			if (st.st_mtime < time(NULL) - (6 * 60 * 60)) {
-				if (unlink(lock_dot_lock.buf))
-					warning_errno(_("unable to delete stale lock file"));
-				else
-					warning(_("deleted stale lock file"));
-			}
-		}
-
-		strbuf_release(&lock_dot_lock);
 		free(lock_path);
 		return 0;
 	}
@@ -1678,6 +1657,42 @@ static const char *get_frequency(enum schedule_priority schedule)
 	}
 }
 
+static const char *extraconfig[] = {
+	"credential.interactive=false",
+	"core.askPass=true", /* 'true' returns success, but no output. */
+	NULL
+};
+
+static const char *get_extra_config_parameters(void) {
+	static const char *result = NULL;
+	struct strbuf builder = STRBUF_INIT;
+
+	if (result)
+		return result;
+
+	for (const char **s = extraconfig; s && *s; s++)
+		strbuf_addf(&builder, "-c %s ", *s);
+
+	result = strbuf_detach(&builder, NULL);
+	return result;
+}
+
+static const char *get_extra_launchctl_strings(void) {
+	static const char *result = NULL;
+	struct strbuf builder = STRBUF_INIT;
+
+	if (result)
+		return result;
+
+	for (const char **s = extraconfig; s && *s; s++) {
+		strbuf_addstr(&builder, "<string>-c</string>\n");
+		strbuf_addf(&builder, "<string>%s</string>\n", *s);
+	}
+
+	result = strbuf_detach(&builder, NULL);
+	return result;
+}
+
 /*
  * get_schedule_cmd` reads the GIT_TEST_MAINT_SCHEDULER environment variable
  * to mock the schedulers that `git maintenance start` rely on.
@@ -1884,6 +1899,7 @@ static int launchctl_schedule_plist(const char *exec_path, enum schedule_priorit
 		   "<array>\n"
 		   "<string>%s/git</string>\n"
 		   "<string>--exec-path=%s</string>\n"
+		   "%s" /* For extra config parameters. */
 		   "<string>for-each-repo</string>\n"
 		   "<string>--config=maintenance.repo</string>\n"
 		   "<string>maintenance</string>\n"
@@ -1892,7 +1908,8 @@ static int launchctl_schedule_plist(const char *exec_path, enum schedule_priorit
 		   "</array>\n"
 		   "<key>StartCalendarInterval</key>\n"
 		   "<array>\n";
-	strbuf_addf(&plist, preamble, name, exec_path, exec_path, frequency);
+	strbuf_addf(&plist, preamble, name, exec_path, exec_path,
+		    get_extra_launchctl_strings(), frequency);
 
 	switch (schedule) {
 	case SCHEDULE_HOURLY:
@@ -2127,11 +2144,12 @@ static int schtasks_schedule_task(const char *exec_path, enum schedule_priority 
 	      "<Actions Context=\"Author\">\n"
 	      "<Exec>\n"
 	      "<Command>\"%s\\headless-git.exe\"</Command>\n"
-	      "<Arguments>--exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%s</Arguments>\n"
+	      "<Arguments>--exec-path=\"%s\" %s for-each-repo --config=maintenance.repo maintenance run --schedule=%s</Arguments>\n"
 	      "</Exec>\n"
 	      "</Actions>\n"
 	      "</Task>\n";
-	fprintf(tfile->fp, xml, exec_path, exec_path, frequency);
+	fprintf(tfile->fp, xml, exec_path, exec_path,
+		get_extra_config_parameters(), frequency);
 	strvec_split(&child.args, cmd);
 	strvec_pushl(&child.args, "/create", "/tn", name, "/f", "/xml",
 				  get_tempfile_path(tfile), NULL);
@@ -2272,8 +2290,8 @@ static int crontab_update_schedule(int run_maintenance, int fd)
 			"# replaced in the future by a Git command.\n\n");
 
 		strbuf_addf(&line_format,
-			    "%%d %%s * * %%s \"%s/git\" --exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%%s\n",
-			    exec_path, exec_path);
+			    "%%d %%s * * %%s \"%s/git\" --exec-path=\"%s\" %s for-each-repo --config=maintenance.repo maintenance run --schedule=%%s\n",
+			    exec_path, exec_path, get_extra_config_parameters());
 		fprintf(cron_in, line_format.buf, minute, "1-23", "*", "hourly");
 		fprintf(cron_in, line_format.buf, minute, "0", "1-6", "daily");
 		fprintf(cron_in, line_format.buf, minute, "0", "0", "weekly");
@@ -2473,7 +2491,7 @@ static int systemd_timer_write_service_template(const char *exec_path)
 	       "\n"
 	       "[Service]\n"
 	       "Type=oneshot\n"
-	       "ExecStart=\"%s/git\" --exec-path=\"%s\" for-each-repo --config=maintenance.repo maintenance run --schedule=%%i\n"
+	       "ExecStart=\"%s/git\" --exec-path=\"%s\" %s for-each-repo --config=maintenance.repo maintenance run --schedule=%%i\n"
 	       "LockPersonality=yes\n"
 	       "MemoryDenyWriteExecute=yes\n"
 	       "NoNewPrivileges=yes\n"
@@ -2483,7 +2501,7 @@ static int systemd_timer_write_service_template(const char *exec_path)
 	       "RestrictSUIDSGID=yes\n"
 	       "SystemCallArchitectures=native\n"
 	       "SystemCallFilter=@system-service\n";
-	if (fprintf(file, unit, exec_path, exec_path) < 0) {
+	if (fprintf(file, unit, exec_path, exec_path, get_extra_config_parameters()) < 0) {
 		error(_("failed to write to '%s'"), filename);
 		fclose(file);
 		goto error;
