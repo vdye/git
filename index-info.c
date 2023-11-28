@@ -5,16 +5,16 @@
 #include "strbuf.h"
 #include "quote.h"
 
-int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata)
+int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata,
+		    struct strbuf *line)
 {
 	const int hexsz = the_hash_algo->hexsz;
-	struct strbuf buf = STRBUF_INIT;
 	struct strbuf uq = STRBUF_INIT;
 	strbuf_getline_fn getline_fn;
 	int ret = 0;
 
 	getline_fn = nul_term_line ? strbuf_getline_nul : strbuf_getline_lf;
-	while (getline_fn(&buf, stdin) != EOF) {
+	while (getline_fn(line, stdin) != EOF) {
 		char *ptr, *tab;
 		char *path_name;
 		struct object_id oid;
@@ -39,8 +39,8 @@ int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata)
 		 * index file and matches "git ls-files --stage" output.
 		 */
 		errno = 0;
-		ul = strtoul(buf.buf, &ptr, 8);
-		if (ptr == buf.buf || *ptr != ' '
+		ul = strtoul(line->buf, &ptr, 8);
+		if (ptr == line->buf || *ptr != ' '
 		    || errno || (unsigned int) ul != ul)
 			goto bad_line;
 		mode = ul;
@@ -81,10 +81,12 @@ int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata)
 		continue;
 
 	bad_line:
-		die("malformed input line '%s'", buf.buf);
+		ret = INDEX_INFO_UNRECOGNIZED_LINE;
+		break;
 	}
-	strbuf_release(&buf);
 	strbuf_release(&uq);
+	if (!ret)
+		strbuf_reset(line);
 
 	return ret;
 }

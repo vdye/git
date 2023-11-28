@@ -787,11 +787,16 @@ static enum parse_opt_result stdin_cacheinfo_callback(
 		ret = error("option '%s' must be the last argument", opt->long_name);
 	} else {
 		int *nul_term_line = opt->value;
+		struct strbuf line = STRBUF_INIT;
 
 		allow_add = allow_replace = allow_remove = 1;
-		ret = read_index_info(*nul_term_line, apply_index_info, NULL);
-		if (ret)
+		ret = read_index_info(*nul_term_line, apply_index_info, NULL, &line);
+
+		if (ret == INDEX_INFO_UNRECOGNIZED_LINE)
+			ret = error("malformed input line '%s'", line.buf);
+		else if (ret)
 			ret = -1;
+		strbuf_release(&line);
 	}
 
 	return ret;
