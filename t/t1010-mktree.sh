@@ -54,9 +54,34 @@ test_expect_success 'ls-tree output in wrong order given to mktree (2)' '
 	test_cmp tree.withsub actual
 '
 
+test_expect_success '--batch creates multiple trees' '
+	cat top >multi-tree &&
+	echo "" >>multi-tree &&
+	cat top.withsub >>multi-tree &&
+
+	cat tree >expect &&
+	cat tree.withsub >>expect &&
+	git mktree --batch <multi-tree >actual &&
+	test_cmp expect actual
+'
+
 test_expect_success 'allow missing object with --missing' '
 	git mktree --missing <top.missing >actual &&
 	test_cmp tree.missing actual
+'
+
+test_expect_success 'mktree with invalid submodule OIDs' '
+	# non-existent OID - ok
+	printf "160000 commit $(test_oid numeric)\tA\n" >in &&
+	git mktree <in >tree.actual &&
+	git ls-tree $(cat tree.actual) >actual &&
+	test_cmp in actual &&
+
+	# existing OID, wrong type - error
+	tree_oid="$(cat tree)" &&
+	printf "160000 commit $tree_oid\tA" |
+	test_must_fail git mktree 2>err &&
+	test_grep "object $tree_oid is a tree but specified type was (commit)" err
 '
 
 test_expect_success 'mktree refuses to read ls-tree -r output (1)' '
@@ -65,6 +90,47 @@ test_expect_success 'mktree refuses to read ls-tree -r output (1)' '
 
 test_expect_success 'mktree refuses to read ls-tree -r output (2)' '
 	test_must_fail git mktree <all.withsub
+'
+
+test_expect_success 'mktree fails on malformed input' '
+	# empty line without --batch
+	echo "" |
+	test_must_fail git mktree 2>err &&
+	test_grep "blank line only valid in batch mode" err &&
+
+	# bad whitespace
+	printf "100644 blob $EMPTY_BLOB A" |
+	test_must_fail git mktree 2>err &&
+	test_grep "input format error" err &&
+
+	# invalid type
+	printf "100644 bad $EMPTY_BLOB\tA" |
+	test_must_fail git mktree 2>err &&
+	test_grep "invalid object type" err &&
+
+	# invalid OID length
+	printf "100755 blob abc123\tA" |
+	test_must_fail git mktree 2>err &&
+	test_grep "input format error" err &&
+
+	# bad quoting
+	printf "100644 blob $EMPTY_BLOB\t\"A" |
+	test_must_fail git mktree 2>err &&
+	test_grep "bad quoting of path name" err
+'
+
+test_expect_success 'mktree fails on mode mismatch' '
+	tree_oid="$(cat tree)" &&
+
+	# mode-type mismatch
+	printf "100644 tree $tree_oid\tA" |
+	test_must_fail git mktree 2>err &&
+	test_grep "object type (tree) doesn${SQ}t match mode type (blob)" err &&
+
+	# mode-object mismatch (no --missing)
+	printf "100644 $tree_oid\tA" |
+	test_must_fail git mktree 2>err &&
+	test_grep "object $tree_oid is a tree but specified type was (blob)" err
 '
 
 test_done

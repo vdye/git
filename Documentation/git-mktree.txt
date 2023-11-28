@@ -3,7 +3,7 @@ git-mktree(1)
 
 NAME
 ----
-git-mktree - Build a tree-object from ls-tree formatted text
+git-mktree - Build a tree-object from formatted tree entries
 
 
 SYNOPSIS
@@ -13,15 +13,14 @@ SYNOPSIS
 
 DESCRIPTION
 -----------
-Reads standard input in non-recursive `ls-tree` output format, and creates
-a tree object.  The order of the tree entries is normalized by mktree so
-pre-sorting the input is not required.  The object name of the tree object
-built is written to the standard output.
+Reads entry information from stdin and creates a tree object from those
+entries. The object name of the tree object built is written to the standard
+output.
 
 OPTIONS
 -------
 -z::
-	Read the NUL-terminated `ls-tree -z` output instead.
+	Input lines are separated with NUL rather than LF.
 
 --missing::
 	Allow missing objects.  The default behaviour (without this option)
@@ -34,6 +33,21 @@ OPTIONS
 	tree is separated by a single blank line. The final newline is
 	optional.  Note - if the `-z` option is used, lines are terminated
 	with NUL.
+
+INPUT FORMAT
+------------
+Tree entries may be specified in any of the formats compatible with the
+`--index-info` option to linkgit:git-update-index[1]:
+
+include::index-info-formats.txt[]
+
+Note that if the `stage` of a tree entry is given, the value must be 0.
+Higher stages represent conflicted files in an index; this information
+cannot be represented in a tree object. The command will fail without
+writing the tree if a higher order stage is specified for any entry.
+
+The order of the tree entries is normalized by `mktree` so pre-sorting the
+input by path is not required.
 
 GIT
 ---

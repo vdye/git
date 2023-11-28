@@ -6,6 +6,7 @@
 #include "builtin.h"
 #include "gettext.h"
 #include "hex.h"
+#include "index-info.h"
 #include "quote.h"
 #include "strbuf.h"
 #include "tree.h"
@@ -95,123 +96,96 @@ static const char *mktree_usage[] = {
 	NULL
 };
 
-static void mktree_line(char *buf, int nul_term_line, int allow_missing,
-			struct tree_entry_array *arr)
+struct mktree_line_data {
+	struct tree_entry_array *arr;
+	int allow_missing;
+};
+
+static int mktree_line(unsigned int mode, struct object_id *oid,
+		       enum object_type obj_type, int stage,
+		       const char *path, void *cbdata)
 {
-	char *ptr, *ntr;
-	const char *p;
-	unsigned mode;
-	enum object_type mode_type; /* object type derived from mode */
-	enum object_type obj_type; /* object type derived from sha */
+	struct mktree_line_data *data = cbdata;
+	enum object_type mode_type = object_type(mode);
 	struct object_info oi = OBJECT_INFO_INIT;
-	char *path, *to_free = NULL;
-	struct object_id oid;
+	enum object_type parsed_obj_type;
 
-	ptr = buf;
-	/*
-	 * Read non-recursive ls-tree output format:
-	 *     mode SP type SP sha1 TAB name
-	 */
-	mode = strtoul(ptr, &ntr, 8);
-	if (ptr == ntr || !ntr || *ntr != ' ')
-		die("input format error: %s", buf);
-	ptr = ntr + 1; /* type */
-	ntr = strchr(ptr, ' ');
-	if (!ntr || parse_oid_hex(ntr + 1, &oid, &p) ||
-	    *p != '\t')
-		die("input format error: %s", buf);
+	if (stage)
+		die(_("path '%s' is unmerged"), path);
 
-	/* It is perfectly normal if we do not have a commit from a submodule */
-	if (S_ISGITLINK(mode))
-		allow_missing = 1;
+	if (obj_type != OBJ_ANY && mode_type != obj_type)
+		die("object type (%s) doesn't match mode type (%s)",
+		    type_name(obj_type), type_name(mode_type));
 
+	oi.typep = &parsed_obj_type;
 
-	*ntr++ = 0; /* now at the beginning of SHA1 */
-
-	path = (char *)p + 1;  /* at the beginning of name */
-	if (!nul_term_line && path[0] == '"') {
-		struct strbuf p_uq = STRBUF_INIT;
-		if (unquote_c_style(&p_uq, path, NULL))
-			die("invalid quoting");
-		path = to_free = strbuf_detach(&p_uq, NULL);
-	}
-
-	/*
-	 * Object type is redundantly derivable three ways.
-	 * These should all agree.
-	 */
-	mode_type = object_type(mode);
-	if (mode_type != type_from_string(ptr)) {
-		die("entry '%s' object type (%s) doesn't match mode type (%s)",
-			path, ptr, type_name(mode_type));
-	}
-
-	/* Check the type of object identified by oid without fetching objects */
-	oi.typep = &obj_type;
-	if (oid_object_info_extended(the_repository, &oid, &oi,
+	if (oid_object_info_extended(the_repository, oid, &oi,
 				     OBJECT_INFO_LOOKUP_REPLACE |
 				     OBJECT_INFO_QUICK |
 				     OBJECT_INFO_SKIP_FETCH_OBJECT) < 0)
-		obj_type = -1;
+		parsed_obj_type = -1;
 
-	if (obj_type < 0) {
-		if (allow_missing) {
-			; /* no problem - missing objects are presumed to be of the right type */
-		} else {
-			die("entry '%s' object %s is unavailable", path, oid_to_hex(&oid));
-		}
-	} else {
-		if (obj_type != mode_type) {
-			/*
-			 * The object exists but is of the wrong type.
-			 * This is a problem regardless of allow_missing
-			 * because the new tree entry will never be correct.
-			 */
-			die("entry '%s' object %s is a %s but specified type was (%s)",
-				path, oid_to_hex(&oid), type_name(obj_type), type_name(mode_type));
-		}
+	if (parsed_obj_type < 0) {
+		/*
+		 * There are two conditions where the object being missing
+		 * is acceptable:
+		 *
+		 * - We're explicitly allowing it with --missing.
+		 * - The object is a submodule, which we wouldn't expect to
+		 *   be in this repo anyway.
+		 *
+		 * If neither condition is met, die().
+		 */
+		if (!data->allow_missing && !S_ISGITLINK(mode))
+			die("entry '%s' object %s is unavailable", path, oid_to_hex(oid));
+
+	} else if (parsed_obj_type != mode_type) {
+		/*
+		 * The object exists but is of the wrong type.
+		 * This is a problem regardless of allow_missing
+		 * because the new tree entry will never be correct.
+		 */
+		die("entry '%s' object %s is a %s but specified type was (%s)",
+		    path, oid_to_hex(oid), type_name(parsed_obj_type), type_name(mode_type));
 	}
 
-	append_to_tree(mode, &oid, path, arr);
-	free(to_free);
+	append_to_tree(mode, oid, path, data->arr);
+	return 0;
 }
 
 int cmd_mktree(int ac, const char **av, const char *prefix)
 {
-	struct strbuf sb = STRBUF_INIT;
 	struct object_id oid;
 	int nul_term_line = 0;
-	int allow_missing = 0;
 	int is_batch_mode = 0;
-	int got_eof = 0;
 	struct tree_entry_array arr = { 0 };
-	strbuf_getline_fn getline_fn;
+	struct mktree_line_data mktree_line_data = { .arr = &arr };
+	struct strbuf line = STRBUF_INIT;
+	int ret;
 
 	const struct option option[] = {
 		OPT_BOOL('z', NULL, &nul_term_line, N_("input is NUL terminated")),
-		OPT_BOOL(0, "missing", &allow_missing, N_("allow missing objects")),
+		OPT_BOOL(0, "missing", &mktree_line_data.allow_missing, N_("allow missing objects")),
 		OPT_BOOL(0, "batch", &is_batch_mode, N_("allow creation of more than one tree")),
 		OPT_END()
 	};
 
 	ac = parse_options(ac, av, prefix, option, mktree_usage, 0);
-	getline_fn = nul_term_line ? strbuf_getline_nul : strbuf_getline_lf;
 
-	while (!got_eof) {
-		while (1) {
-			if (getline_fn(&sb, stdin) == EOF) {
-				got_eof = 1;
-				break;
-			}
-			if (sb.buf[0] == '\0') {
+	do {
+		ret = read_index_info(nul_term_line, mktree_line, &mktree_line_data, &line);
+		if (ret < 0)
+			break;
+
+		if (ret == INDEX_INFO_UNRECOGNIZED_LINE) {
+			if (line.len)
+				die("input format error: %s", line.buf);
+			else if (!is_batch_mode)
 				/* empty lines denote tree boundaries in batch mode */
-				if (is_batch_mode)
-					break;
 				die("input format error: (blank line only valid in batch mode)");
-			}
-			mktree_line(sb.buf, nul_term_line, allow_missing, &arr);
 		}
-		if (is_batch_mode && got_eof && arr.nr < 1) {
+
+		if (is_batch_mode && !ret && arr.nr < 1) {
 			/*
 			 * Execution gets here if the last tree entry is terminated with a
 			 * new-line.  The final new-line has been made optional to be
@@ -224,9 +198,9 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 			fflush(stdout);
 		}
 		tree_entry_array_clear(&arr, 1); /* reset tree entry buffer for re-use in batch mode */
-	}
+	} while (ret > 0);
 
+	strbuf_release(&line);
 	tree_entry_array_release(&arr, 1);
-	strbuf_release(&sb);
-	return 0;
+	return !!ret;
 }
