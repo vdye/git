@@ -18,6 +18,7 @@ int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata,
 		char *ptr, *tab;
 		char *path_name;
 		struct object_id oid;
+		enum object_type obj_type = OBJ_ANY;
 		unsigned int mode;
 		unsigned long ul;
 		int stage;
@@ -51,18 +52,17 @@ int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata,
 
 		if (tab[-2] == ' ' && '0' <= tab[-1] && tab[-1] <= '3') {
 			stage = tab[-1] - '0';
-			ptr = tab + 1; /* point at the head of path */
+			path_name = tab + 1; /* point at the head of path */
 			tab = tab - 2; /* point at tail of sha1 */
 		} else {
 			stage = 0;
-			ptr = tab + 1; /* point at the head of path */
+			path_name = tab + 1; /* point at the head of path */
 		}
 
 		if (get_oid_hex(tab - hexsz, &oid) ||
 			tab[-(hexsz + 1)] != ' ')
 			goto bad_line;
 
-		path_name = ptr;
 		if (!nul_term_line && path_name[0] == '"') {
 			strbuf_reset(&uq);
 			if (unquote_c_style(&uq, path_name, NULL)) {
@@ -72,7 +72,15 @@ int read_index_info(int nul_term_line, each_index_info_fn fn, void *cbdata,
 			path_name = uq.buf;
 		}
 
-		ret = fn(mode, &oid, stage, path_name, cbdata);
+		/* Get the type, if provided */
+		if (tab - hexsz - 1 > ptr + 1) {
+			if (*(tab - hexsz - 1) != ' ')
+				goto bad_line;
+			*(tab - hexsz - 1) = '\0';
+			obj_type = type_from_string(ptr + 1);
+		}
+
+		ret = fn(mode, &oid, obj_type, stage, path_name, cbdata);
 		if (ret) {
 			ret = -1;
 			break;

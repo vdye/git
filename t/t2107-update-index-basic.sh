@@ -153,6 +153,11 @@ test_expect_success '--index-info fails on malformed input' '
 	test_must_fail git update-index --index-info 2>err &&
 	test_grep "malformed input line" err &&
 
+	# invalid type
+	printf "100644 bad $EMPTY_BLOB\tA" |
+	test_must_fail git update-index --index-info 2>err &&
+	test_grep "invalid object type" err &&
+
 	# invalid stage value
 	printf "100644 $EMPTY_BLOB 5\tA" |
 	test_must_fail git update-index --index-info 2>err &&

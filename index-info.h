@@ -2,8 +2,9 @@
 #define INDEX_INFO_H
 
 #include "hash.h"
+#include "object.h"
 
-typedef int (*each_index_info_fn)(unsigned int, struct object_id *, int, const char *, void *);
+typedef int (*each_index_info_fn)(unsigned int, struct object_id *, enum object_type, int, const char *, void *);
 
 #define INDEX_INFO_UNRECOGNIZED_LINE 1
 

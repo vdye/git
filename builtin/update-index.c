@@ -510,7 +510,8 @@ static void update_one(const char *path)
 	report("add '%s'", path);
 }
 
-static int apply_index_info(unsigned int mode, struct object_id *oid, int stage,
+static int apply_index_info(unsigned int mode, struct object_id *oid,
+			    enum object_type obj_type UNUSED, int stage,
 			    const char *path_name, void *cbdata UNUSED)
 {
 	if (!verify_path(path_name, mode)) {
