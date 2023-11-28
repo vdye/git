@@ -12,7 +12,7 @@
 #include "parse-options.h"
 #include "object-store-ll.h"
 
-static struct treeent {
+static struct tree_entry {
 	unsigned mode;
 	struct object_id oid;
 	int len;
@@ -22,7 +22,7 @@ static int alloc, used;
 
 static void append_to_tree(unsigned mode, struct object_id *oid, char *path)
 {
-	struct treeent *ent;
+	struct tree_entry *ent;
 	size_t len = strlen(path);
 	if (strchr(path, '/'))
 		die("path %s contains slash", path);
@@ -38,8 +38,8 @@ static void append_to_tree(unsigned mode, struct object_id *oid, char *path)
 
 static int ent_compare(const void *a_, const void *b_)
 {
-	struct treeent *a = *(struct treeent **)a_;
-	struct treeent *b = *(struct treeent **)b_;
+	struct tree_entry *a = *(struct tree_entry **)a_;
+	struct tree_entry *b = *(struct tree_entry **)b_;
 	return base_name_compare(a->name, a->len, a->mode,
 				 b->name, b->len, b->mode);
 }
@@ -56,7 +56,7 @@ static void write_tree(struct object_id *oid)
 
 	strbuf_init(&buf, size);
 	for (i = 0; i < used; i++) {
-		struct treeent *ent = entries[i];
+		struct tree_entry *ent = entries[i];
 		strbuf_addf(&buf, "%o %s%c", ent->mode, ent->name, '\0');
 		strbuf_add(&buf, ent->oid.hash, the_hash_algo->rawsz);
 	}
