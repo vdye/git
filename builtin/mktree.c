@@ -4,6 +4,7 @@
  * Copyright (c) Junio C Hamano, 2006, 2009
  */
 #include "builtin.h"
+#include "cache-tree.h"
 #include "gettext.h"
 #include "hex.h"
 #include "index-info.h"
@@ -23,6 +24,11 @@ struct tree_entry {
 	int len;
 	char name[FLEX_ARRAY];
 };
+
+static inline size_t df_path_len(size_t pathlen, unsigned int mode)
+{
+	return S_ISDIR(mode) ? pathlen - 1 : pathlen;
+}
 
 struct tree_entry_array {
 	size_t nr, alloc;
@@ -60,17 +66,25 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 	if (literally) {
 		FLEX_ALLOC_MEM(ent, name, path, len);
 	} else {
+		size_t len_to_copy = len;
+
 		/* Normalize and validate entry path */
 		if (S_ISDIR(mode)) {
-			while(len > 0 && is_dir_sep(path[len - 1]))
-				len--;
+			while(len_to_copy > 0 && is_dir_sep(path[len_to_copy - 1]))
+				len_to_copy--;
+			len = len_to_copy + 1; /* add space for trailing slash */
 		}
-		FLEX_ALLOC_MEM(ent, name, path, len);
+		ent = xcalloc(1, st_add3(sizeof(struct tree_entry), len, 1));
+		memcpy(ent->name, path, len_to_copy);
 
 		if (!verify_path(ent->name, mode))
 			die(_("invalid path '%s'"), path);
 		if (strchr(ent->name, '/'))
 			die("path %s contains slash", path);
+
+		/* Add trailing slash to dir */
+		if (S_ISDIR(mode))
+			ent->name[len - 1] = '/';
 	}
 
 	ent->mode = mode;
@@ -88,11 +102,14 @@ static int ent_compare(const void *a_, const void *b_, void *ctx)
 	struct tree_entry *b = *(struct tree_entry **)b_;
 	int ignore_mode = *((int *)ctx);
 
-	if (ignore_mode)
-		cmp = name_compare(a->name, a->len, b->name, b->len);
-	else
-		cmp = base_name_compare(a->name, a->len, a->mode,
-					b->name, b->len, b->mode);
+	size_t a_len = a->len, b_len = b->len;
+
+	if (ignore_mode) {
+		a_len = df_path_len(a_len, a->mode);
+		b_len = df_path_len(b_len, b->mode);
+	}
+
+	cmp = name_compare(a->name, a_len, b->name, b_len);
 	return cmp ? cmp : b->order - a->order;
 }
 
@@ -108,8 +125,8 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 	for (size_t i = 0; i < count; i++) {
 		struct tree_entry *curr = arr->entries[i];
 		if (prev &&
-		    !name_compare(prev->name, prev->len,
-				  curr->name, curr->len)) {
+		    !name_compare(prev->name, df_path_len(prev->len, prev->mode),
+				  curr->name, df_path_len(curr->len, curr->mode))) {
 			FREE_AND_NULL(curr);
 		} else {
 			arr->entries[arr->nr++] = curr;
@@ -122,24 +139,43 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
 }
 
+static int add_tree_entry_to_index(struct index_state *istate,
+				   struct tree_entry *ent)
+{
+	struct cache_entry *ce;
+	struct strbuf ce_name = STRBUF_INIT;
+	strbuf_add(&ce_name, ent->name, ent->len);
+
+	ce = make_cache_entry(istate, ent->mode, &ent->oid, ent->name, 0, 0);
+	if (!ce)
+		return error(_("make_cache_entry failed for path '%s'"), ent->name);
+
+	add_index_entry(istate, ce, ADD_CACHE_JUST_APPEND);
+	strbuf_release(&ce_name);
+	return 0;
+}
+
 static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
 {
-	struct strbuf buf;
-	size_t size = 0;
+	struct index_state istate = INDEX_STATE_INIT(the_repository);
+	istate.sparse_index = 1;
 
 	sort_and_dedup_tree_entry_array(arr);
-	for (size_t i = 0; i < arr->nr; i++)
-		size += 32 + arr->entries[i]->len;
 
-	strbuf_init(&buf, size);
+	/* Construct an in-memory index from the provided entries */
 	for (size_t i = 0; i < arr->nr; i++) {
 		struct tree_entry *ent = arr->entries[i];
-		strbuf_addf(&buf, "%o %s%c", ent->mode, ent->name, '\0');
-		strbuf_add(&buf, ent->oid.hash, the_hash_algo->rawsz);
+
+		if (add_tree_entry_to_index(&istate, ent))
+			die(_("failed to add tree entry '%s'"), ent->name);
 	}
 
-	write_object_file(buf.buf, buf.len, OBJ_TREE, oid);
-	strbuf_release(&buf);
+	/* Write out new tree */
+	if (cache_tree_update(&istate, WRITE_TREE_SILENT | WRITE_TREE_MISSING_OK))
+		die(_("failed to write tree"));
+	oidcpy(oid, &istate.cache_tree->oid);
+
+	release_index(&istate);
 }
 
 static void write_tree_literally(struct tree_entry_array *arr,
