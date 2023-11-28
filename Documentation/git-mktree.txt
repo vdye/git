@@ -54,7 +54,8 @@ cannot be represented in a tree object. The command will fail without
 writing the tree if a higher order stage is specified for any entry.
 
 The order of the tree entries is normalized by `mktree` so pre-sorting the
-input by path is not required.
+input by path is not required. Multiple entries provided with the same path
+are deduplicated, with only the last one specified added to the tree.
 
 GIT
 ---

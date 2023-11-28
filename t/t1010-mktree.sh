@@ -6,10 +6,15 @@ TEST_PASSES_SANITIZE_LEAK=true
 . ./test-lib.sh
 
 test_expect_success setup '
-	for d in a a- a0
+	for d in folder folder- folder0
 	do
 		mkdir "$d" && echo "$d/one" >"$d/one" &&
 		git add "$d" || return 1
+	done &&
+	for f in before folder.txt later
+	do
+		echo "$f" >"$f" &&
+		git add "$f" || return 1
 	done &&
 	echo zero >one &&
 	git update-index --add --info-only one &&
@@ -171,7 +176,7 @@ test_expect_success '--literally can create invalid trees' '
 
 test_expect_success 'mktree validates path' '
 	tree_oid="$(cat tree)" &&
-	blob_oid="$(git rev-parse $tree_oid:a/one)" &&
+	blob_oid="$(git rev-parse $tree_oid:folder.txt)" &&
 	head_oid="$(git rev-parse HEAD)" &&
 
 	# Valid: tree with or without trailing slash, blob without trailing slash
@@ -200,6 +205,33 @@ test_expect_success 'mktree validates path' '
 	printf "040000 tree $tree_oid\t.git/" |
 	test_must_fail git mktree 2>err &&
 	test_grep "invalid path ${SQ}.git/${SQ}" err
+'
+
+test_expect_success 'mktree with duplicate entries' '
+	tree_oid=$(cat tree) &&
+	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
+	before_oid=$(git rev-parse ${tree_oid}:before) &&
+	head_oid=$(git rev-parse HEAD) &&
+
+	{
+		printf "100755 blob $before_oid\ttest\n" &&
+		printf "040000 tree $folder_oid\ttest-\n" &&
+		printf "160000 commit $head_oid\ttest.txt\n" &&
+		printf "040000 tree $folder_oid\ttest\n" &&
+		printf "100644 blob $before_oid\ttest0\n" &&
+		printf "160000 commit $head_oid\ttest-\n"
+	} >top.dup &&
+	git mktree <top.dup >tree.actual &&
+
+	{
+		printf "160000 commit $head_oid\ttest-\n" &&
+		printf "160000 commit $head_oid\ttest.txt\n" &&
+		printf "040000 tree $folder_oid\ttest\n" &&
+		printf "100644 blob $before_oid\ttest0\n"
+	} >expect &&
+	git ls-tree $(cat tree.actual) >actual &&
+
+	test_cmp expect actual
 '
 
 test_done

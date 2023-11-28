@@ -15,6 +15,9 @@
 #include "object-store-ll.h"
 
 struct tree_entry {
+	/* Internal */
+	size_t order;
+
 	unsigned mode;
 	struct object_id oid;
 	int len;
@@ -74,15 +77,49 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 	ent->len = len;
 	oidcpy(&ent->oid, oid);
 
+	ent->order = arr->nr;
 	tree_entry_array_push(arr, ent);
 }
 
-static int ent_compare(const void *a_, const void *b_)
+static int ent_compare(const void *a_, const void *b_, void *ctx)
 {
+	int cmp;
 	struct tree_entry *a = *(struct tree_entry **)a_;
 	struct tree_entry *b = *(struct tree_entry **)b_;
-	return base_name_compare(a->name, a->len, a->mode,
-				 b->name, b->len, b->mode);
+	int ignore_mode = *((int *)ctx);
+
+	if (ignore_mode)
+		cmp = name_compare(a->name, a->len, b->name, b->len);
+	else
+		cmp = base_name_compare(a->name, a->len, a->mode,
+					b->name, b->len, b->mode);
+	return cmp ? cmp : b->order - a->order;
+}
+
+static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
+{
+	size_t count = arr->nr;
+	struct tree_entry *prev = NULL;
+
+	int ignore_mode = 1;
+	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
+
+	arr->nr = 0;
+	for (size_t i = 0; i < count; i++) {
+		struct tree_entry *curr = arr->entries[i];
+		if (prev &&
+		    !name_compare(prev->name, prev->len,
+				  curr->name, curr->len)) {
+			FREE_AND_NULL(curr);
+		} else {
+			arr->entries[arr->nr++] = curr;
+			prev = curr;
+		}
+	}
+
+	/* Sort again to order the entries for tree insertion */
+	ignore_mode = 0;
+	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
 }
 
 static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
@@ -90,7 +127,7 @@ static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
 	struct strbuf buf;
 	size_t size = 0;
 
-	QSORT(arr->entries, arr->nr, ent_compare);
+	sort_and_dedup_tree_entry_array(arr);
 	for (size_t i = 0; i < arr->nr; i++)
 		size += 32 + arr->entries[i]->len;
 
