@@ -369,4 +369,42 @@ test_expect_success 'mktree fails on directory-file conflict' '
 	test_grep "You have both folder/one and folder/one/deeper/deep" err
 '
 
+test_expect_success 'mktree with remove entries' '
+	tree_oid="$(cat tree)" &&
+	blob_oid="$(git rev-parse $tree_oid:folder.txt)" &&
+
+	{
+		printf "100644 blob $blob_oid\ttest/deeper/deep.txt\n" &&
+		printf "100644 blob $blob_oid\ttest.txt\n" &&
+		printf "100644 blob $blob_oid\texample\n" &&
+		printf "100644 blob $blob_oid\texample.a/file\n" &&
+		printf "100644 blob $blob_oid\texample.txt\n" &&
+		printf "040000 tree $tree_oid\tfolder\n" &&
+		printf "0 $ZERO_OID\tfolder\n" &&
+		printf "0 $ZERO_OID\tmissing\n"
+	} | git mktree >tree.base &&
+
+	{
+		printf "0 $ZERO_OID\texample.txt\n" &&
+		printf "0 $ZERO_OID\ttest/deeper\n"
+	} | git mktree $(cat tree.base) >tree.actual &&
+
+	{
+		printf "100644 blob $blob_oid\texample\n" &&
+		printf "100644 blob $blob_oid\texample.a/file\n" &&
+		printf "100644 blob $blob_oid\ttest.txt\n"
+	} >expect &&
+	git ls-tree -r $(cat tree.actual) >actual &&
+
+	test_cmp expect actual
+'
+
+test_expect_success 'type and oid not checked if entry mode is 0' '
+	# type and oid do not match
+	printf "0 commit $EMPTY_TREE\tfolder.txt\n" |
+	git mktree >tree.actual &&
+
+	test "$(cat tree.actual)" = $EMPTY_TREE
+'
+
 test_done

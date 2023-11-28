@@ -63,6 +63,10 @@ entries nested within one or more directories. These entries are inserted
 into the appropriate tree in the base tree-ish if one exists. Otherwise,
 empty parent trees are created to contain the entries.
 
+An entry with a mode of "0" will remove an entry of the same name from the
+base tree-ish. If no tree-ish argument is given, or the entry does not exist
+in that tree, the entry is ignored.
+
 The order of the tree entries is normalized by `mktree` so pre-sorting the
 input by path is not required. Multiple entries provided with the same path
 are deduplicated, with only the last one specified added to the tree.

@@ -32,7 +32,7 @@ struct tree_entry {
 
 static inline size_t df_path_len(size_t pathlen, unsigned int mode)
 {
-	return S_ISDIR(mode) ? pathlen - 1 : pathlen;
+	return (S_ISDIR(mode) || !mode) ? pathlen - 1 : pathlen;
 }
 
 struct tree_entry_array {
@@ -108,7 +108,7 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 		size_t len_to_copy = len;
 
 		/* Normalize and validate entry path */
-		if (S_ISDIR(mode)) {
+		if (S_ISDIR(mode) || !mode) {
 			while(len_to_copy > 0 && is_dir_sep(path[len_to_copy - 1]))
 				len_to_copy--;
 			len = len_to_copy + 1; /* add space for trailing slash */
@@ -124,7 +124,7 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 			arr->has_nested_entries = 1;
 
 		/* Add trailing slash to dir */
-		if (S_ISDIR(mode))
+		if (S_ISDIR(mode) || !mode)
 			ent->name[len - 1] = '/';
 	}
 
@@ -209,7 +209,7 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 
 			if (!skip_entry) {
 				arr->entries[arr->nr++] = curr;
-				if (S_ISDIR(curr->mode))
+				if (S_ISDIR(curr->mode) || !curr->mode)
 					tree_entry_array_push(&parent_dir_ents, curr);
 			} else {
 				FREE_AND_NULL(curr);
@@ -270,6 +270,9 @@ static int build_index_from_tree(const struct object_id *oid,
 static int add_tree_entry_to_index(struct build_index_data *data,
 				   struct tree_entry *ent)
 {
+	if (!ent->mode)
+		return 0;
+
 	if (ent->expand_dir) {
 		int ret = 0;
 		struct pathspec ps = { 0 };
@@ -450,6 +453,10 @@ static int mktree_line(unsigned int mode, struct object_id *oid,
 	if (stage)
 		die(_("path '%s' is unmerged"), path);
 
+	/* OID ignored for zero-mode entries; append unconditionally */
+	if (!mode)
+		goto append_entry;
+
 	if (obj_type != OBJ_ANY && mode_type != obj_type)
 		die("object type (%s) doesn't match mode type (%s)",
 		    type_name(obj_type), type_name(mode_type));
@@ -484,6 +491,7 @@ static int mktree_line(unsigned int mode, struct object_id *oid,
 		}
 	}
 
+append_entry:
 	append_to_tree(mode, oid, path, data->arr, data->literally);
 	return 0;
 }
