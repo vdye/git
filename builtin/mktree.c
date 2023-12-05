@@ -139,6 +139,35 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
 }
 
+struct tree_entry_iterator {
+	struct tree_entry *current;
+
+	/* private */
+	struct {
+		struct tree_entry_array *arr;
+		size_t idx;
+	} priv;
+};
+
+static void tree_entry_iterator_init(struct tree_entry_iterator *iter,
+				     struct tree_entry_array *arr)
+{
+	iter->priv.arr = arr;
+	iter->priv.idx = 0;
+	iter->current = 0 < arr->nr ? arr->entries[0] : NULL;
+}
+
+/*
+ * Advance the tree entry iterator to the next entry in the array. If no
+ * entries remain, 'current' is set to NULL.
+ */
+static void tree_entry_iterator_advance(struct tree_entry_iterator *iter)
+{
+	iter->current = (iter->priv.idx + 1) < iter->priv.arr->nr
+			? iter->priv.arr->entries[++iter->priv.idx]
+			: NULL;
+}
+
 static int add_tree_entry_to_index(struct index_state *istate,
 				   struct tree_entry *ent)
 {
@@ -157,14 +186,18 @@ static int add_tree_entry_to_index(struct index_state *istate,
 
 static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
 {
+	struct tree_entry_iterator iter = { NULL };
 	struct index_state istate = INDEX_STATE_INIT(the_repository);
 	istate.sparse_index = 1;
 
 	sort_and_dedup_tree_entry_array(arr);
 
-	/* Construct an in-memory index from the provided entries */
-	for (size_t i = 0; i < arr->nr; i++) {
-		struct tree_entry *ent = arr->entries[i];
+	tree_entry_iterator_init(&iter, arr);
+
+	/* Construct an in-memory index from the provided entries & base tree */
+	while (iter.current) {
+		struct tree_entry *ent = iter.current;
+		tree_entry_iterator_advance(&iter);
 
 		if (add_tree_entry_to_index(&istate, ent))
 			die(_("failed to add tree entry '%s'"), ent->name);
