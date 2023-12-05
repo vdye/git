@@ -12,7 +12,9 @@
 #include "read-cache-ll.h"
 #include "strbuf.h"
 #include "tree.h"
+#include "object-name.h"
 #include "parse-options.h"
+#include "pathspec.h"
 #include "object-store-ll.h"
 
 struct tree_entry {
@@ -204,47 +206,124 @@ static void tree_entry_iterator_advance(struct tree_entry_iterator *iter)
 			: NULL;
 }
 
-static int add_tree_entry_to_index(struct index_state *istate,
+struct build_index_data {
+	struct tree_entry_iterator iter;
+	struct hashmap *df_name_hash;
+	struct index_state istate;
+};
+
+static int add_tree_entry_to_index(struct build_index_data *data,
 				   struct tree_entry *ent)
 {
 	struct cache_entry *ce;
-	struct strbuf ce_name = STRBUF_INIT;
-	strbuf_add(&ce_name, ent->name, ent->len);
-
-	ce = make_cache_entry(istate, ent->mode, &ent->oid, ent->name, 0, 0);
+	ce = make_cache_entry(&data->istate, ent->mode, &ent->oid, ent->name, 0, 0);
 	if (!ce)
 		return error(_("make_cache_entry failed for path '%s'"), ent->name);
 
-	add_index_entry(istate, ce, ADD_CACHE_JUST_APPEND);
-	strbuf_release(&ce_name);
+	add_index_entry(&data->istate, ce, ADD_CACHE_JUST_APPEND);
 	return 0;
 }
 
-static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
+static int build_index_from_tree(const struct object_id *oid,
+				 struct strbuf *base, const char *filename,
+				 unsigned mode, void *context)
 {
-	struct tree_entry_iterator iter = { NULL };
-	struct index_state istate = INDEX_STATE_INIT(the_repository);
-	istate.sparse_index = 1;
+	int result;
+	struct tree_entry *base_tree_ent;
+	struct build_index_data *cbdata = context;
+	size_t filename_len = strlen(filename);
+	size_t path_len = S_ISDIR(mode) ? st_add3(filename_len, base->len, 1)
+					: st_add(filename_len, base->len);
+
+	/* Create a tree entry from the current entry in read_tree iteration */
+	base_tree_ent = xcalloc(1, st_add3(sizeof(struct tree_entry), path_len, 1));
+	base_tree_ent->len = path_len;
+	base_tree_ent->mode = mode;
+	oidcpy(&base_tree_ent->oid, oid);
+
+	memcpy(base_tree_ent->name, base->buf, base->len);
+	memcpy(base_tree_ent->name + base->len, filename, filename_len);
+	if (S_ISDIR(mode))
+		base_tree_ent->name[base_tree_ent->len - 1] = '/';
+
+	while (cbdata->iter.current) {
+		struct tree_entry *ent = cbdata->iter.current;
+
+		int cmp = name_compare(ent->name, ent->len,
+				       base_tree_ent->name, base_tree_ent->len);
+		if (!cmp || cmp < 0) {
+			tree_entry_iterator_advance(&cbdata->iter);
+
+			if (add_tree_entry_to_index(cbdata, ent) < 0) {
+				result = error(_("failed to add tree entry '%s'"), ent->name);
+				goto cleanup_and_return;
+			}
+
+			if (!cmp) {
+				result = 0;
+				goto cleanup_and_return;
+			} else
+				continue;
+		}
+
+		break;
+	}
+
+	/*
+	 * If the tree entry should be replaced with an entry with the same name
+	 * (but different mode), skip it.
+	 */
+	hashmap_entry_init(&base_tree_ent->ent,
+			   memhash(base_tree_ent->name, df_path_len(base_tree_ent->len, base_tree_ent->mode)));
+	if (hashmap_get_entry(cbdata->df_name_hash, base_tree_ent, ent, NULL)) {
+		result = 0;
+		goto cleanup_and_return;
+	}
+
+	if (add_tree_entry_to_index(cbdata, base_tree_ent)) {
+		result = -1;
+		goto cleanup_and_return;
+	}
+
+	result = 0;
+
+cleanup_and_return:
+	FREE_AND_NULL(base_tree_ent);
+	return result;
+}
+
+static void write_tree(struct tree_entry_array *arr, struct tree *base_tree,
+		       struct object_id *oid)
+{
+	struct build_index_data cbdata = { 0 };
+	struct pathspec ps = { 0 };
 
 	sort_and_dedup_tree_entry_array(arr);
 
-	tree_entry_iterator_init(&iter, arr);
+	index_state_init(&cbdata.istate, the_repository);
+	cbdata.istate.sparse_index = 1;
+	tree_entry_iterator_init(&cbdata.iter, arr);
+	cbdata.df_name_hash = &arr->df_name_hash;
 
 	/* Construct an in-memory index from the provided entries & base tree */
-	while (iter.current) {
-		struct tree_entry *ent = iter.current;
-		tree_entry_iterator_advance(&iter);
+	if (base_tree &&
+	    read_tree(the_repository, base_tree, &ps, build_index_from_tree, &cbdata) < 0)
+		die(_("failed to create tree"));
 
-		if (add_tree_entry_to_index(&istate, ent))
+	while (cbdata.iter.current) {
+		struct tree_entry *ent = cbdata.iter.current;
+		tree_entry_iterator_advance(&cbdata.iter);
+
+		if (add_tree_entry_to_index(&cbdata, ent))
 			die(_("failed to add tree entry '%s'"), ent->name);
 	}
 
 	/* Write out new tree */
-	if (cache_tree_update(&istate, WRITE_TREE_SILENT | WRITE_TREE_MISSING_OK))
+	if (cache_tree_update(&cbdata.istate, WRITE_TREE_SILENT | WRITE_TREE_MISSING_OK))
 		die(_("failed to write tree"));
-	oidcpy(oid, &istate.cache_tree->oid);
+	oidcpy(oid, &cbdata.istate.cache_tree->oid);
 
-	release_index(&istate);
+	release_index(&cbdata.istate);
 }
 
 static void write_tree_literally(struct tree_entry_array *arr,
@@ -268,7 +347,7 @@ static void write_tree_literally(struct tree_entry_array *arr,
 }
 
 static const char *mktree_usage[] = {
-	"git mktree [-z] [--missing] [--literally] [--batch]",
+	"git mktree [-z] [--missing] [--literally] [--batch] [<tree-ish>]",
 	NULL
 };
 
@@ -334,6 +413,7 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 	struct tree_entry_array arr = { 0 };
 	struct mktree_line_data mktree_line_data = { .arr = &arr };
 	struct strbuf line = STRBUF_INIT;
+	struct tree *base_tree = NULL;
 	int ret;
 
 	const struct option option[] = {
@@ -346,6 +426,22 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 	};
 
 	ac = parse_options(ac, av, prefix, option, mktree_usage, 0);
+	if (ac > 1)
+		usage_with_options(mktree_usage, option);
+
+	if (ac) {
+		struct object_id base_tree_oid;
+
+		if (mktree_line_data.literally)
+			die(_("option '%s' and tree-ish cannot be used together"), "--literally");
+
+		if (repo_get_oid(the_repository, av[0], &base_tree_oid))
+			die(_("not a valid object name %s"), av[0]);
+
+		base_tree = parse_tree_indirect(&base_tree_oid);
+		if (!base_tree)
+			die(_("not a tree object: %s"), oid_to_hex(&base_tree_oid));
+	}
 
 	tree_entry_array_init(&arr);
 
@@ -373,7 +469,7 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 			if (mktree_line_data.literally)
 				write_tree_literally(&arr, &oid);
 			else
-				write_tree(&arr, &oid);
+				write_tree(&arr, base_tree, &oid);
 			puts(oid_to_hex(&oid));
 			fflush(stdout);
 		}

@@ -234,4 +234,40 @@ test_expect_success 'mktree with duplicate entries' '
 	test_cmp expect actual
 '
 
+test_expect_success 'mktree with base tree' '
+	tree_oid=$(cat tree) &&
+	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
+	before_oid=$(git rev-parse ${tree_oid}:before) &&
+	head_oid=$(git rev-parse HEAD) &&
+
+	{
+		printf "040000 tree $folder_oid\ttest\n" &&
+		printf "100644 blob $before_oid\ttest.txt\n" &&
+		printf "040000 tree $folder_oid\ttest-\n" &&
+		printf "160000 commit $head_oid\ttest0\n"
+	} >top.base &&
+	git mktree <top.base >tree.base &&
+
+	{
+		printf "100755 blob $before_oid\tz\n" &&
+		printf "160000 commit $head_oid\ttest.xyz\n" &&
+		printf "040000 tree $folder_oid\ta\n" &&
+		printf "100644 blob $before_oid\ttest\n"
+	} >top.append &&
+	git mktree $(cat tree.base) <top.append >tree.actual &&
+
+	{
+		printf "040000 tree $folder_oid\ta\n" &&
+		printf "100644 blob $before_oid\ttest\n" &&
+		printf "040000 tree $folder_oid\ttest-\n" &&
+		printf "100644 blob $before_oid\ttest.txt\n" &&
+		printf "160000 commit $head_oid\ttest.xyz\n" &&
+		printf "160000 commit $head_oid\ttest0\n" &&
+		printf "100755 blob $before_oid\tz\n"
+	} >expect &&
+	git ls-tree $(cat tree.actual) >actual &&
+
+	test_cmp expect actual
+'
+
 test_done

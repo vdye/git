@@ -9,7 +9,7 @@ git-mktree - Build a tree-object from formatted tree entries
 SYNOPSIS
 --------
 [verse]
-'git mktree' [-z] [--missing] [--literally] [--batch]
+'git mktree' [-z] [--missing] [--literally] [--batch] [<tree-ish>]
 
 DESCRIPTION
 -----------
@@ -40,6 +40,11 @@ OPTIONS
 	tree is separated by a single blank line. The final newline is
 	optional.  Note - if the `-z` option is used, lines are terminated
 	with NUL.
+
+<tree-ish>::
+	If provided, the tree entries provided in stdin are added to this
+	tree rather than a new empty one, replacing existing entries with
+	identical names. Not compatible with `--literally`.
 
 INPUT FORMAT
 ------------
