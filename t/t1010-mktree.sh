@@ -85,12 +85,21 @@ test_expect_success 'mktree with invalid submodule OIDs' '
 	done
 '
 
-test_expect_success 'mktree refuses to read ls-tree -r output (1)' '
-	test_must_fail git mktree <all
+test_expect_success 'mktree reads ls-tree -r output (1)' '
+	git mktree <all >actual &&
+	test_cmp tree actual
 '
 
-test_expect_success 'mktree refuses to read ls-tree -r output (2)' '
-	test_must_fail git mktree <all.withsub
+test_expect_success 'mktree reads ls-tree -r output (2)' '
+	git mktree <all.withsub >actual &&
+	test_cmp tree.withsub actual
+'
+
+test_expect_success 'mktree de-duplicates files inside directories' '
+	git ls-tree $(cat tree) >everything &&
+	cat <all >top_and_all &&
+	git mktree <top_and_all >actual &&
+	test_cmp tree actual
 '
 
 test_expect_success 'mktree fails on malformed input' '
@@ -234,6 +243,50 @@ test_expect_success 'mktree with duplicate entries' '
 	test_cmp expect actual
 '
 
+test_expect_success 'mktree adds entry after nested entry' '
+	tree_oid=$(cat tree) &&
+	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
+	one_oid=$(git rev-parse ${tree_oid}:folder/one) &&
+
+	{
+		printf "040000 tree $folder_oid\tearly\n" &&
+		printf "100644 blob $one_oid\tearly/one\n" &&
+		printf "100644 blob $one_oid\tlater\n" &&
+		printf "040000 tree $EMPTY_TREE\tnew-tree\n" &&
+		printf "100644 blob $one_oid\tnew-tree/one\n" &&
+		printf "100644 blob $one_oid\tzzz\n"
+	} >top.rec &&
+	git mktree <top.rec >tree.actual &&
+
+	{
+		printf "040000 tree $folder_oid\tearly\n" &&
+		printf "100644 blob $one_oid\tlater\n" &&
+		printf "040000 tree $folder_oid\tnew-tree\n" &&
+		printf "100644 blob $one_oid\tzzz\n"
+	} >expect &&
+	git ls-tree $(cat tree.actual) >actual &&
+
+	test_cmp expect actual
+'
+
+test_expect_success 'mktree inserts entries into directories' '
+	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
+	one_oid=$(git rev-parse ${tree_oid}:folder/one) &&
+	blob_oid=$(git rev-parse ${tree_oid}:before) &&
+	{
+		printf "040000 tree $folder_oid\tfolder\n" &&
+		printf "100644 blob $blob_oid\tfolder/two\n"
+	} | git mktree >actual &&
+
+	{
+		printf "100644 blob $one_oid\tfolder/one\n" &&
+		printf "100644 blob $blob_oid\tfolder/two\n"
+	} >expect &&
+	git ls-tree -r $(cat actual) >actual &&
+
+	test_cmp expect actual
+'
+
 test_expect_success 'mktree with base tree' '
 	tree_oid=$(cat tree) &&
 	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
@@ -268,6 +321,52 @@ test_expect_success 'mktree with base tree' '
 	git ls-tree $(cat tree.actual) >actual &&
 
 	test_cmp expect actual
+'
+
+test_expect_success 'mktree with base tree (deep)' '
+	tree_oid=$(cat tree) &&
+	folder_oid=$(git rev-parse ${tree_oid}:folder) &&
+	before_oid=$(git rev-parse ${tree_oid}:before) &&
+	folder_one_oid=$(git rev-parse ${tree_oid}:folder/one) &&
+	head_oid=$(git rev-parse HEAD) &&
+
+	{
+		printf "100755 blob $before_oid\tfolder/before\n" &&
+		printf "100644 blob $before_oid\tfolder/one.txt\n" &&
+		printf "160000 commit $head_oid\tfolder/sub\n" &&
+		printf "040000 tree $folder_oid\tfolder/one\n" &&
+		printf "040000 tree $folder_oid\tfolder/one/deeper\n"
+	} >top.append &&
+	git mktree <top.append $(cat tree) >tree.actual &&
+
+	{
+		printf "100755 blob $before_oid\tfolder/before\n" &&
+		printf "100644 blob $before_oid\tfolder/one.txt\n" &&
+		printf "100644 blob $folder_one_oid\tfolder/one/deeper/one\n" &&
+		printf "100644 blob $folder_one_oid\tfolder/one/one\n" &&
+		printf "160000 commit $head_oid\tfolder/sub\n"
+	} >expect &&
+	git ls-tree -r $(cat tree.actual) -- folder/ >actual &&
+
+	test_cmp expect actual
+'
+
+test_expect_success 'mktree fails on directory-file conflict' '
+	tree_oid="$(cat tree)" &&
+	blob_oid="$(git rev-parse $tree_oid:folder.txt)" &&
+
+	{
+		printf "100644 blob $blob_oid\ttest\n" &&
+		printf "100644 blob $blob_oid\ttest/deeper\n"
+	} |
+	test_must_fail git mktree 2>err &&
+	test_grep "You have both test and test/deeper" err &&
+
+	{
+		printf "100644 blob $blob_oid\tfolder/one/deeper/deep\n"
+	} |
+	test_must_fail git mktree $tree_oid 2>err &&
+	test_grep "You have both folder/one and folder/one/deeper/deep" err
 '
 
 test_done

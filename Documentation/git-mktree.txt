@@ -58,6 +58,11 @@ Higher stages represent conflicted files in an index; this information
 cannot be represented in a tree object. The command will fail without
 writing the tree if a higher order stage is specified for any entry.
 
+Entries may use full pathnames containing directory separators to specify
+entries nested within one or more directories. These entries are inserted
+into the appropriate tree in the base tree-ish if one exists. Otherwise,
+empty parent trees are created to contain the entries.
+
 The order of the tree entries is normalized by `mktree` so pre-sorting the
 input by path is not required. Multiple entries provided with the same path
 are deduplicated, with only the last one specified added to the tree.

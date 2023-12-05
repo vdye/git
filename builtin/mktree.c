@@ -22,6 +22,7 @@ struct tree_entry {
 
 	/* Internal */
 	size_t order;
+	int expand_dir;
 
 	unsigned mode;
 	struct object_id oid;
@@ -39,6 +40,7 @@ struct tree_entry_array {
 	struct tree_entry **entries;
 
 	struct hashmap df_name_hash;
+	int has_nested_entries;
 };
 
 static int df_name_hash_cmp(const void *cmp_data UNUSED,
@@ -68,6 +70,13 @@ static void tree_entry_array_push(struct tree_entry_array *arr, struct tree_entr
 {
 	ALLOC_GROW(arr->entries, arr->nr + 1, arr->alloc);
 	arr->entries[arr->nr++] = ent;
+}
+
+static struct tree_entry *tree_entry_array_pop(struct tree_entry_array *arr)
+{
+	if (!arr->nr)
+		return NULL;
+	return arr->entries[--arr->nr];
 }
 
 static void tree_entry_array_clear(struct tree_entry_array *arr, int free_entries)
@@ -109,8 +118,10 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 
 		if (!verify_path(ent->name, mode))
 			die(_("invalid path '%s'"), path);
-		if (strchr(ent->name, '/'))
-			die("path %s contains slash", path);
+
+		/* mark has_nested_entries if needed */
+		if (!arr->has_nested_entries && strchr(ent->name, '/'))
+			arr->has_nested_entries = 1;
 
 		/* Add trailing slash to dir */
 		if (S_ISDIR(mode))
@@ -168,6 +179,46 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 	ignore_mode = 0;
 	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
 
+	if (arr->has_nested_entries) {
+		struct tree_entry_array parent_dir_ents = { 0 };
+
+		count = arr->nr;
+		arr->nr = 0;
+
+		/* Remove any entries where one of its parent dirs has a higher 'order' */
+		for (size_t i = 0; i < count; i++) {
+			const char *skipped_prefix;
+			struct tree_entry *parent;
+			struct tree_entry *curr = arr->entries[i];
+			int skip_entry = 0;
+
+			while ((parent = tree_entry_array_pop(&parent_dir_ents))) {
+				if (!skip_prefix(curr->name, parent->name, &skipped_prefix))
+					continue;
+
+				/* entry in dir, so we push the parent back onto the stack */
+				tree_entry_array_push(&parent_dir_ents, parent);
+
+				if (parent->order > curr->order)
+					skip_entry = 1;
+				else
+					parent->expand_dir = 1;
+
+				break;
+			}
+
+			if (!skip_entry) {
+				arr->entries[arr->nr++] = curr;
+				if (S_ISDIR(curr->mode))
+					tree_entry_array_push(&parent_dir_ents, curr);
+			} else {
+				FREE_AND_NULL(curr);
+			}
+		}
+
+		tree_entry_array_release(&parent_dir_ents, 0);
+	}
+
 	/* Finally, initialize the directory-file conflict hash map */
 	for (size_t i = 0; i < count; i++) {
 		struct tree_entry *curr = arr->entries[i];
@@ -212,15 +263,40 @@ struct build_index_data {
 	struct index_state istate;
 };
 
+static int build_index_from_tree(const struct object_id *oid,
+				 struct strbuf *base, const char *filename,
+				 unsigned mode, void *context);
+
 static int add_tree_entry_to_index(struct build_index_data *data,
 				   struct tree_entry *ent)
 {
-	struct cache_entry *ce;
-	ce = make_cache_entry(&data->istate, ent->mode, &ent->oid, ent->name, 0, 0);
-	if (!ce)
-		return error(_("make_cache_entry failed for path '%s'"), ent->name);
+	if (ent->expand_dir) {
+		int ret = 0;
+		struct pathspec ps = { 0 };
+		struct tree *subtree = parse_tree_indirect(&ent->oid);
+		struct strbuf base_path = STRBUF_INIT;
+		strbuf_add(&base_path, ent->name, ent->len);
 
-	add_index_entry(&data->istate, ce, ADD_CACHE_JUST_APPEND);
+		if (!subtree)
+			ret = error(_("not a tree object: %s"), oid_to_hex(&ent->oid));
+		else if (read_tree_at(the_repository, subtree, &base_path, 0, &ps,
+				 build_index_from_tree, data) < 0)
+			ret = -1;
+
+		strbuf_release(&base_path);
+		if (ret)
+			return ret;
+
+	} else {
+		struct cache_entry *ce = make_cache_entry(&data->istate,
+							  ent->mode, &ent->oid,
+							  ent->name, 0, 0);
+		if (!ce)
+			return error(_("make_cache_entry failed for path '%s'"), ent->name);
+
+		add_index_entry(&data->istate, ce, ADD_CACHE_JUST_APPEND);
+	}
+
 	return 0;
 }
 
@@ -247,10 +323,12 @@ static int build_index_from_tree(const struct object_id *oid,
 		base_tree_ent->name[base_tree_ent->len - 1] = '/';
 
 	while (cbdata->iter.current) {
+		const char *skipped_prefix;
 		struct tree_entry *ent = cbdata->iter.current;
+		int cmp;
 
-		int cmp = name_compare(ent->name, ent->len,
-				       base_tree_ent->name, base_tree_ent->len);
+		cmp = name_compare(ent->name, ent->len,
+				   base_tree_ent->name, base_tree_ent->len);
 		if (!cmp || cmp < 0) {
 			tree_entry_iterator_advance(&cbdata->iter);
 
@@ -264,6 +342,11 @@ static int build_index_from_tree(const struct object_id *oid,
 				goto cleanup_and_return;
 			} else
 				continue;
+		} else if (skip_prefix(ent->name, base_tree_ent->name, &skipped_prefix) &&
+			   S_ISDIR(base_tree_ent->mode)) {
+			/* The entry is in the current traversed tree entry, so we recurse */
+			result = READ_TREE_RECURSIVE;
+			goto cleanup_and_return;
 		}
 
 		break;
