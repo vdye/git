@@ -16,6 +16,8 @@
 #include "object-store-ll.h"
 
 struct tree_entry {
+	struct hashmap_entry ent;
+
 	/* Internal */
 	size_t order;
 
@@ -33,7 +35,32 @@ static inline size_t df_path_len(size_t pathlen, unsigned int mode)
 struct tree_entry_array {
 	size_t nr, alloc;
 	struct tree_entry **entries;
+
+	struct hashmap df_name_hash;
 };
+
+static int df_name_hash_cmp(const void *cmp_data UNUSED,
+			    const struct hashmap_entry *eptr,
+			    const struct hashmap_entry *entry_or_key,
+			    const void *keydata UNUSED)
+{
+	const struct tree_entry *e1, *e2;
+	size_t e1_len, e2_len;
+
+	e1 = container_of(eptr, const struct tree_entry, ent);
+	e2 = container_of(entry_or_key, const struct tree_entry, ent);
+
+	e1_len = df_path_len(e1->len, e1->mode);
+	e2_len = df_path_len(e2->len, e2->mode);
+
+	return e1_len != e2_len ||
+	       name_compare(e1->name, e1_len, e2->name, e2_len);
+}
+
+static void tree_entry_array_init(struct tree_entry_array *arr)
+{
+	hashmap_init(&arr->df_name_hash, df_name_hash_cmp, NULL, 0);
+}
 
 static void tree_entry_array_push(struct tree_entry_array *arr, struct tree_entry *ent)
 {
@@ -48,6 +75,7 @@ static void tree_entry_array_clear(struct tree_entry_array *arr, int free_entrie
 			FREE_AND_NULL(arr->entries[i]);
 	}
 	arr->nr = 0;
+	hashmap_clear(&arr->df_name_hash);
 }
 
 static void tree_entry_array_release(struct tree_entry_array *arr, int free_entries)
@@ -137,6 +165,14 @@ static void sort_and_dedup_tree_entry_array(struct tree_entry_array *arr)
 	/* Sort again to order the entries for tree insertion */
 	ignore_mode = 0;
 	QSORT_S(arr->entries, arr->nr, ent_compare, &ignore_mode);
+
+	/* Finally, initialize the directory-file conflict hash map */
+	for (size_t i = 0; i < count; i++) {
+		struct tree_entry *curr = arr->entries[i];
+		hashmap_entry_init(&curr->ent,
+				   memhash(curr->name, df_path_len(curr->len, curr->mode)));
+		hashmap_put(&arr->df_name_hash, &curr->ent);
+	}
 }
 
 struct tree_entry_iterator {
@@ -310,6 +346,8 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 	};
 
 	ac = parse_options(ac, av, prefix, option, mktree_usage, 0);
+
+	tree_entry_array_init(&arr);
 
 	do {
 		ret = read_index_info(nul_term_line, mktree_line, &mktree_line_data, &line);
