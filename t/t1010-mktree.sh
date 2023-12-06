@@ -169,4 +169,37 @@ test_expect_success '--literally can create invalid trees' '
 	test_grep "not properly sorted" err
 '
 
+test_expect_success 'mktree validates path' '
+	tree_oid="$(cat tree)" &&
+	blob_oid="$(git rev-parse $tree_oid:a/one)" &&
+	head_oid="$(git rev-parse HEAD)" &&
+
+	# Valid: tree with or without trailing slash, blob without trailing slash
+	{
+		printf "040000 tree $tree_oid\tfolder1/\n" &&
+		printf "040000 tree $tree_oid\tfolder2\n" &&
+		printf "100644 blob $blob_oid\tfile.txt\n"
+	} | git mktree >actual &&
+
+	# Invalid: blob with trailing slash
+	printf "100644 blob $blob_oid\ttest/" |
+	test_must_fail git mktree 2>err &&
+	test_grep "invalid path ${SQ}test/${SQ}" err &&
+
+	# Invalid: dotdot
+	printf "040000 tree $tree_oid\t../" |
+	test_must_fail git mktree 2>err &&
+	test_grep "invalid path ${SQ}../${SQ}" err &&
+
+	# Invalid: dot
+	printf "040000 tree $tree_oid\t." |
+	test_must_fail git mktree 2>err &&
+	test_grep "invalid path ${SQ}.${SQ}" err &&
+
+	# Invalid: .git
+	printf "040000 tree $tree_oid\t.git/" |
+	test_must_fail git mktree 2>err &&
+	test_grep "invalid path ${SQ}.git/${SQ}" err
+'
+
 test_done

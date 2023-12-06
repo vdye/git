@@ -8,6 +8,7 @@
 #include "hex.h"
 #include "index-info.h"
 #include "quote.h"
+#include "read-cache-ll.h"
 #include "strbuf.h"
 #include "tree.h"
 #include "parse-options.h"
@@ -52,10 +53,23 @@ static void append_to_tree(unsigned mode, struct object_id *oid, const char *pat
 {
 	struct tree_entry *ent;
 	size_t len = strlen(path);
-	if (!literally && strchr(path, '/'))
-		die("path %s contains slash", path);
 
-	FLEX_ALLOC_MEM(ent, name, path, len);
+	if (literally) {
+		FLEX_ALLOC_MEM(ent, name, path, len);
+	} else {
+		/* Normalize and validate entry path */
+		if (S_ISDIR(mode)) {
+			while(len > 0 && is_dir_sep(path[len - 1]))
+				len--;
+		}
+		FLEX_ALLOC_MEM(ent, name, path, len);
+
+		if (!verify_path(ent->name, mode))
+			die(_("invalid path '%s'"), path);
+		if (strchr(ent->name, '/'))
+			die("path %s contains slash", path);
+	}
+
 	ent->mode = mode;
 	ent->len = len;
 	oidcpy(&ent->oid, oid);
