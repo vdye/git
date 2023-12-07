@@ -129,4 +129,44 @@ test_expect_success 'mktree fails on mode mismatch' '
 	test_grep "object $tree_oid is a tree but specified type was (blob)" err
 '
 
+test_expect_success '--literally can create invalid trees' '
+	tree_oid="$(cat tree)" &&
+	blob_oid="$(git rev-parse ${tree_oid}:one)" &&
+
+	# duplicate entries
+	{
+		printf "040000 tree $tree_oid\tmy-tree\n" &&
+		printf "100644 blob $blob_oid\ttest-file\n" &&
+		printf "100755 blob $blob_oid\ttest-file\n"
+	} | git mktree --literally >tree.bad &&
+	git cat-file tree $(cat tree.bad) >top.bad &&
+	test_must_fail git hash-object --stdin -t tree <top.bad 2>err &&
+	test_grep "contains duplicate file entries" err &&
+
+	# disallowed path
+	{
+		printf "100644 blob $blob_oid\t.git\n"
+	} | git mktree --literally >tree.bad &&
+	git cat-file tree $(cat tree.bad) >top.bad &&
+	test_must_fail git hash-object --stdin -t tree <top.bad 2>err &&
+	test_grep "contains ${SQ}.git${SQ}" err &&
+
+	# nested entry
+	{
+		printf "100644 blob $blob_oid\tdeeper/my-file\n"
+	} | git mktree --literally >tree.bad &&
+	git cat-file tree $(cat tree.bad) >top.bad &&
+	test_must_fail git hash-object --stdin -t tree <top.bad 2>err &&
+	test_grep "contains full pathnames" err &&
+
+	# bad entry ordering
+	{
+		printf "100644 blob $blob_oid\tB\n" &&
+		printf "040000 tree $tree_oid\tA\n"
+	} | git mktree --literally >tree.bad &&
+	git cat-file tree $(cat tree.bad) >top.bad &&
+	test_must_fail git hash-object --stdin -t tree <top.bad 2>err &&
+	test_grep "not properly sorted" err
+'
+
 test_done

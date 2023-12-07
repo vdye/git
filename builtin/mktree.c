@@ -48,11 +48,11 @@ static void tree_entry_array_release(struct tree_entry_array *arr, int free_entr
 }
 
 static void append_to_tree(unsigned mode, struct object_id *oid, const char *path,
-			   struct tree_entry_array *arr)
+			   struct tree_entry_array *arr, int literally)
 {
 	struct tree_entry *ent;
 	size_t len = strlen(path);
-	if (strchr(path, '/'))
+	if (!literally && strchr(path, '/'))
 		die("path %s contains slash", path);
 
 	FLEX_ALLOC_MEM(ent, name, path, len);
@@ -91,14 +91,35 @@ static void write_tree(struct tree_entry_array *arr, struct object_id *oid)
 	strbuf_release(&buf);
 }
 
+static void write_tree_literally(struct tree_entry_array *arr,
+				 struct object_id *oid)
+{
+	struct strbuf buf;
+	size_t size = 0;
+
+	for (size_t i = 0; i < arr->nr; i++)
+		size += 32 + arr->entries[i]->len;
+
+	strbuf_init(&buf, size);
+	for (size_t i = 0; i < arr->nr; i++) {
+		struct tree_entry *ent = arr->entries[i];
+		strbuf_addf(&buf, "%o %s%c", ent->mode, ent->name, '\0');
+		strbuf_add(&buf, ent->oid.hash, the_hash_algo->rawsz);
+	}
+
+	write_object_file(buf.buf, buf.len, OBJ_TREE, oid);
+	strbuf_release(&buf);
+}
+
 static const char *mktree_usage[] = {
-	"git mktree [-z] [--missing] [--batch]",
+	"git mktree [-z] [--missing] [--literally] [--batch]",
 	NULL
 };
 
 struct mktree_line_data {
 	struct tree_entry_array *arr;
 	int allow_missing;
+	int literally;
 };
 
 static int mktree_line(unsigned int mode, struct object_id *oid,
@@ -145,7 +166,7 @@ static int mktree_line(unsigned int mode, struct object_id *oid,
 		}
 	}
 
-	append_to_tree(mode, oid, path, data->arr);
+	append_to_tree(mode, oid, path, data->arr, data->literally);
 	return 0;
 }
 
@@ -162,6 +183,8 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 	const struct option option[] = {
 		OPT_BOOL('z', NULL, &nul_term_line, N_("input is NUL terminated")),
 		OPT_BOOL(0, "missing", &mktree_line_data.allow_missing, N_("allow missing objects")),
+		OPT_BOOL(0, "literally", &mktree_line_data.literally,
+			 N_("do not sort, deduplicate, or validate paths of tree entries")),
 		OPT_BOOL(0, "batch", &is_batch_mode, N_("allow creation of more than one tree")),
 		OPT_END()
 	};
@@ -189,7 +212,10 @@ int cmd_mktree(int ac, const char **av, const char *prefix)
 			 */
 			; /* skip creating an empty tree */
 		} else {
-			write_tree(&arr, &oid);
+			if (mktree_line_data.literally)
+				write_tree_literally(&arr, &oid);
+			else
+				write_tree(&arr, &oid);
 			puts(oid_to_hex(&oid));
 			fflush(stdout);
 		}

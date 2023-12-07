@@ -9,7 +9,7 @@ git-mktree - Build a tree-object from formatted tree entries
 SYNOPSIS
 --------
 [verse]
-'git mktree' [-z] [--missing] [--batch]
+'git mktree' [-z] [--missing] [--literally] [--batch]
 
 DESCRIPTION
 -----------
@@ -27,6 +27,13 @@ OPTIONS
 	is to verify that each tree entry's hash identifies an existing
 	object.  This option has no effect on the treatment of gitlink entries
 	(aka "submodules") which are always allowed to be missing.
+
+--literally::
+	Create the tree from the tree entries provided to stdin in the order
+	they are provided without performing additional sorting,
+	deduplication, or path validation on them. This option is primarily
+	useful for creating invalid tree objects to use in tests of how Git
+	deals with various forms of tree corruption.
 
 --batch::
 	Allow building of more than one tree object before exiting.  Each
