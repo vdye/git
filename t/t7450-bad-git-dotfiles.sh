@@ -45,7 +45,7 @@ test_expect_success 'check names' '
 	test_cmp expect actual
 '
 
-test_expect_failure 'check urls' '
+test_expect_success 'check urls' '
 	cat >expect <<-\EOF &&
 	./bar/baz/foo.git
 	https://example.com/foo.git
