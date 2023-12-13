@@ -15,6 +15,13 @@ static const char *submodule_check_name_usage[] = {
 	NULL
 };
 
+#define TEST_TOOL_CHECK_URL_USAGE \
+	"test-tool submodule check-url <url>"
+static const char *submodule_check_url_usage[] = {
+	TEST_TOOL_CHECK_URL_USAGE,
+	NULL
+};
+
 #define TEST_TOOL_IS_ACTIVE_USAGE \
 	"test-tool submodule is-active <name>"
 static const char *submodule_is_active_usage[] = {
@@ -36,22 +43,24 @@ static const char *submodule_usage[] = {
 	NULL
 };
 
+typedef int (*check_fn_t)(const char *);
+
 /*
  * Exit non-zero if any of the submodule names given on the command line is
  * invalid. If no names are given, filter stdin to print only valid names
  * (which is primarily intended for testing).
  */
-static int check_name(int argc, const char **argv)
+static int check_submodule(int argc, const char **argv, check_fn_t check_fn)
 {
 	if (argc > 1) {
 		while (*++argv) {
-			if (check_submodule_name(*argv) < 0)
+			if (check_fn(*argv) < 0)
 				return 1;
 		}
 	} else {
 		struct strbuf buf = STRBUF_INIT;
 		while (strbuf_getline(&buf, stdin) != EOF) {
-			if (!check_submodule_name(buf.buf))
+			if (!check_fn(buf.buf))
 				printf("%s\n", buf.buf);
 		}
 		strbuf_release(&buf);
@@ -69,7 +78,20 @@ static int cmd__submodule_check_name(int argc, const char **argv)
 	if (argc)
 		usage_with_options(submodule_check_name_usage, options);
 
-	return check_name(argc, argv);
+	return check_submodule(argc, argv, check_submodule_name);
+}
+
+static int cmd__submodule_check_url(int argc, const char **argv)
+{
+	struct option options[] = {
+		OPT_END()
+	};
+	argc = parse_options(argc, argv, "test-tools", options,
+			     submodule_check_url_usage, 0);
+	if (argc)
+		usage_with_options(submodule_check_url_usage, options);
+
+	return check_submodule(argc, argv, check_submodule_url);
 }
 
 static int cmd__submodule_is_active(int argc, const char **argv)
@@ -195,6 +217,7 @@ static int cmd__submodule_config_writeable(int argc, const char **argv UNUSED)
 
 static struct test_cmd cmds[] = {
 	{ "check-name", cmd__submodule_check_name },
+	{ "check-url", cmd__submodule_check_url },
 	{ "is-active", cmd__submodule_is_active },
 	{ "resolve-relative-url", cmd__submodule_resolve_relative_url},
 	{ "config-list", cmd__submodule_config_list },
