@@ -2490,10 +2490,10 @@ static int hash_format_check_report(struct fsck_options *opts UNUSED,
 	return 1;
 }
 
-static int index_mem(struct index_state *istate,
-		     struct object_id *oid, void *buf, size_t size,
-		     enum object_type type,
-		     const char *path, unsigned flags)
+int index_mem(struct index_state *istate,
+	      struct object_id *oid, void *buf, size_t size,
+	      enum object_type type,
+	      const char *path, unsigned flags)
 {
 	int ret = 0;
 	int re_allocated = 0;
