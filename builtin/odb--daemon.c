@@ -1,5 +1,6 @@
 #include "builtin.h"
 #include "config.h"
+#include "object-file.h"
 #include "object-store.h"
 #include "oidmap.h"
 #include "parse-options.h"
@@ -172,6 +173,44 @@ fail:
 	return 0;
 }
 
+static int odb_ipc_cb__hash_object(struct my_odb_ipc_state *state,
+				   const char *command, size_t command_len,
+				   ipc_server_reply_cb *reply_cb,
+				   struct ipc_server_reply_data *reply_data)
+{
+	struct odb_over_ipc__hash_object__request *req;
+	struct odb_over_ipc__hash_object__response *resp;
+	const char *content;
+	size_t content_len;
+
+	if (command_len < sizeof(*req))
+		BUG("incorrect size for binary data");
+
+	req = (struct odb_over_ipc__hash_object__request *)command;
+
+	content = command + sizeof(*req);
+	content_len = command_len - sizeof(*req);
+
+	resp = xmalloc(sizeof(*resp));
+	memcpy(&resp->key.key, "hash-object", 11);
+
+	if (index_mem(the_repository->index, &resp->oid, (void *)content,
+		      content_len, req->type, NULL, req->flags) < 0)
+		goto fail;
+
+	reply_cb(reply_data, (const char *)resp, sizeof(*resp));
+
+	return 0;
+
+fail:
+	/*
+	 * Send the client an error response to force it to do
+	 * the work itself.
+	 */
+	reply_cb(reply_data, "error", 6);
+	return 0;
+}
+
 /*
  * This callback handles IPC requests from clients.  We run on an
  * arbitrary thread.
@@ -224,6 +263,18 @@ static int odb_ipc_cb(void *data,
 		trace2_region_leave("odb-daemon", "get-oid", NULL);
 
 		return ret;
+	}
+
+	if (!strcmp(command, "hash-object")) {
+		/*
+		 * A client has requested that we hash an object and optionally
+		 * store it in the ODB.
+		 */
+		trace2_region_enter("odb-daemon", "hash-object", NULL);
+		ret = odb_ipc_cb__hash_object(state, command, command_len,
+					      reply_cb, reply_data);
+		trace2_region_leave("odb-daemon", "hash-object", NULL);
+		return 0;
 	}
 
 	// TODO respond to other requests from client.

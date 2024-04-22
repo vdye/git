@@ -2631,6 +2631,10 @@ int index_fd(struct index_state *istate, struct object_id *oid,
 	     enum object_type type, const char *path, unsigned flags)
 {
 	int ret;
+	if (!odb_over_ipc__hash_object(the_repository, oid, fd, type, flags)) {
+		close(fd);
+		return 0;
+	}
 
 	/*
 	 * Call xsize_t() only when needed to avoid potentially unnecessary
