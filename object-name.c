@@ -24,6 +24,7 @@
 #include "commit-reach.h"
 #include "date.h"
 #include "object-file-convert.h"
+#include "odb-over-ipc.h"
 
 static int get_oid_oneline(struct repository *r, const char *, struct object_id *, struct commit_list *);
 
@@ -1086,13 +1087,17 @@ enum get_oid_result get_parent(struct repository *r,
 			       struct object_id *result, int idx)
 {
 	struct object_id oid;
-	enum get_oid_result ret = get_oid_1(r, name, len, &oid,
-					    GET_OID_COMMITTISH);
+	enum get_oid_result ret;
 	struct commit *commit;
 	struct commit_list *p;
 
+	if (odb_over_ipc__get_parent(r, name, len, idx, result) == 0)
+		return FOUND;
+
+	ret = get_oid_1(r, name, len, &oid, GET_OID_COMMITTISH);
 	if (ret)
 		return ret;
+
 	commit = lookup_commit_reference(r, &oid);
 	if (repo_parse_commit(r, commit))
 		return MISSING_OBJECT;
