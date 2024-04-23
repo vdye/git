@@ -206,4 +206,62 @@ done:
 	return ret;
 }
 
+int odb_over_ipc__hash_object(struct repository *r, struct object_id *oid,
+			      int fd, enum object_type type, unsigned flags)
+{
+	struct odb_over_ipc__hash_object__request req;
+	struct odb_over_ipc__hash_object__response *resp;
+
+	struct strbuf answer = STRBUF_INIT;
+	struct strbuf content = STRBUF_INIT;
+	struct strbuf msg = STRBUF_INIT;
+	int ret;
+
+	if (is_daemon)
+		return -1;
+
+	if (!core_use_odb_over_ipc)
+		return -1;
+
+	if (r != the_repository)	// TODO not dealing with this
+		return -1;
+
+	/*
+	 * Read the content from the file descriptor in to the buffer and then
+	 * send the request over IPC.
+	 */
+	if (strbuf_read(&content, fd, LARGE_PACKET_MAX) < 0)
+		return error_errno("could not read object content");
+
+	memset(&req, 0, sizeof(req));
+	memcpy(req.key.key, "hash-object", 11);
+	req.type = type;
+	req.flags = flags;
+	req.content_size = content.len;
+
+	/* Append the content at the end of the request */
+	strbuf_init(&msg, sizeof(req) + content.len);
+	strbuf_add(&msg, &req, sizeof(req));
+	strbuf_addbuf(&msg, &content);
+
+	ret = odb_over_ipc__command((const char *)msg.buf, msg.len, &answer);
+	if (ret)
+		return ret;
+
+	if (!strncmp(answer.buf, "error", 5)) {
+		trace2_printf("odb-over-ipc: failed");
+		return -1;
+	}
+
+	if (answer.len < sizeof(*resp))
+		BUG("incorrect size for binary data");
+	resp = (struct odb_over_ipc__hash_object__response *)answer.buf;
+
+	oidcpy(oid, &resp->oid);
+
+	strbuf_release(&content);
+	strbuf_release(&answer);
+	return ret;
+}
+
 #endif /* SUPPORTS_SIMPLE_IPC */

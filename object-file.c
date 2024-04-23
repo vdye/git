@@ -2490,10 +2490,10 @@ static int hash_format_check_report(struct fsck_options *opts UNUSED,
 	return 1;
 }
 
-static int index_mem(struct index_state *istate,
-		     struct object_id *oid, void *buf, size_t size,
-		     enum object_type type,
-		     const char *path, unsigned flags)
+int index_mem(struct index_state *istate,
+	      struct object_id *oid, void *buf, size_t size,
+	      enum object_type type,
+	      const char *path, unsigned flags)
 {
 	int ret = 0;
 	int re_allocated = 0;
@@ -2631,6 +2631,10 @@ int index_fd(struct index_state *istate, struct object_id *oid,
 	     enum object_type type, const char *path, unsigned flags)
 {
 	int ret;
+	if (!odb_over_ipc__hash_object(the_repository, oid, fd, type, flags)) {
+		close(fd);
+		return 0;
+	}
 
 	/*
 	 * Call xsize_t() only when needed to avoid potentially unnecessary

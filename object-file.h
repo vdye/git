@@ -20,6 +20,7 @@ extern int fetch_if_missing;
 #define HASH_SILENT 8
 int index_fd(struct index_state *istate, struct object_id *oid, int fd, struct stat *st, enum object_type type, const char *path, unsigned flags);
 int index_path(struct index_state *istate, struct object_id *oid, const char *path, struct stat *st, unsigned flags);
+int index_mem(struct index_state *istate, struct object_id *oid, void *buf, size_t size, enum object_type type, const char *path, unsigned flags);
 
 /*
  * Create the directory containing the named path, using care to be
