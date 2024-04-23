@@ -1081,9 +1081,9 @@ static int get_oid_basic(struct repository *r, const char *str, int len,
 	return 0;
 }
 
-static enum get_oid_result get_parent(struct repository *r,
-				      const char *name, int len,
-				      struct object_id *result, int idx)
+enum get_oid_result get_parent(struct repository *r,
+			       const char *name, int len,
+			       struct object_id *result, int idx)
 {
 	struct object_id oid;
 	enum get_oid_result ret = get_oid_1(r, name, len, &oid,

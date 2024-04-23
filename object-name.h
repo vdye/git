@@ -121,6 +121,10 @@ struct object *repo_peel_to_type(struct repository *r,
 				 const char *name, int namelen,
 				 struct object *o, enum object_type);
 
+enum get_oid_result get_parent(struct repository *r,
+			       const char *name, int len,
+			       struct object_id *result, int idx);
+
 /* Convert to/from hex/sha1 representation */
 #define MINIMUM_ABBREV minimum_abbrev
 #define DEFAULT_ABBREV default_abbrev
