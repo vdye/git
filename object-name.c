@@ -1125,7 +1125,7 @@ enum get_oid_result get_nth_ancestor(struct repository *r,
 	struct commit *commit;
 	int ret;
 
-	if (odb_over_ipc__get_nth_ancestor(r, name, len, generation, result) == 0)
+	if (odb_over_ipc__get_ancestor(r, name, len, generation, result) == 0)
 		return FOUND;
 
 	ret = get_oid_1(r, name, len, &oid, GET_OID_COMMITTISH);

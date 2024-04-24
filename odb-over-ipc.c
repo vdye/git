@@ -311,12 +311,12 @@ int odb_over_ipc__get_parent(struct repository *r, const char *name, int len,
 	return ret;
 }
 
-int odb_over_ipc__get_nth_ancestor(struct repository *r, const char *name,
-				   int len, int generation,
-				   struct object_id *result)
+int odb_over_ipc__get_ancestor(struct repository *r, const char *name,
+			       int len, int generation,
+			       struct object_id *result)
 {
-	struct odb_over_ipc__get_nth_ancestor__request req;
-	struct odb_over_ipc__get_nth_ancestor__response *resp;
+	struct odb_over_ipc__get_ancestor__request req;
+	struct odb_over_ipc__get_ancestor__response *resp;
 	struct strbuf msg = STRBUF_INIT;
 	struct strbuf answer = STRBUF_INIT;
 	int ret;
@@ -331,7 +331,7 @@ int odb_over_ipc__get_nth_ancestor(struct repository *r, const char *name,
 		return -1;
 
 	memset(&req, 0, sizeof(req));
-	memcpy(req.key.key, "get-nth-ancestor", 16);
+	memcpy(req.key.key, "get-ancestor", 12);
 	req.generation = generation;
 	req.name_len = len;
 
@@ -351,7 +351,7 @@ int odb_over_ipc__get_nth_ancestor(struct repository *r, const char *name,
 
 	if (answer.len != sizeof(*resp))
 		BUG("incorrect size for binary data");
-	resp = (struct odb_over_ipc__get_nth_ancestor__response *)answer.buf;
+	resp = (struct odb_over_ipc__get_ancestor__response *)answer.buf;
 
 	oidcpy(result, &resp->oid);
 

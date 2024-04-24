@@ -255,13 +255,13 @@ fail:
 	return 0;
 }
 
-static int odb_ipc_cb__get_nth_ancestor(struct my_odb_ipc_state *state,
-					const char *command, size_t command_len,
-					ipc_server_reply_cb *reply_cb,
-					struct ipc_server_reply_data *reply_data)
+static int odb_ipc_cb__get_ancestor(struct my_odb_ipc_state *state,
+				    const char *command, size_t command_len,
+				    ipc_server_reply_cb *reply_cb,
+				    struct ipc_server_reply_data *reply_data)
 {
-	struct odb_over_ipc__get_nth_ancestor__request *req;
-	struct odb_over_ipc__get_nth_ancestor__response *resp;
+	struct odb_over_ipc__get_ancestor__request *req;
+	struct odb_over_ipc__get_ancestor__response *resp;
 	const char *name;
 	size_t name_len;
 	int ret;
@@ -269,7 +269,7 @@ static int odb_ipc_cb__get_nth_ancestor(struct my_odb_ipc_state *state,
 	if (command_len < sizeof(*req))
 		BUG("incorrect size for binary data");
 
-	req = (struct odb_over_ipc__get_nth_ancestor__request *)command;
+	req = (struct odb_over_ipc__get_ancestor__request *)command;
 
 	name = command + sizeof(*req);
 	name_len = command_len - sizeof(*req);
@@ -278,7 +278,7 @@ static int odb_ipc_cb__get_nth_ancestor(struct my_odb_ipc_state *state,
 		BUG("incorrect data length");
 
 	resp = xmalloc(sizeof(*resp));
-	memcpy(&resp->key.key, "get-nth-ancestor", 11);
+	memcpy(&resp->key.key, "get-ancestor", 11);
 
 	ret = get_nth_ancestor(the_repository, name, name_len, &resp->oid,
 			       req->generation);
@@ -377,14 +377,14 @@ static int odb_ipc_cb(void *data,
 		return 0;
 	}
 
-	if (!strcmp(command, "get-nth-ancestor")) {
+	if (!strcmp(command, "get-ancestor")) {
 		/*
 		 * A client has requested that we find the nth ancestpr of a
 		 * given object.
 		 */
 		trace2_region_enter("odb-daemon", "get-nth-ancestor", NULL);
-		ret = odb_ipc_cb__get_nth_ancestor(state, command, command_len,
-						   reply_cb, reply_data);
+		ret = odb_ipc_cb__get_ancestor(state, command, command_len,
+					       reply_cb, reply_data);
 		trace2_region_leave("odb-daemon", "get-nth-ancestor", NULL);
 		return 0;
 	}
