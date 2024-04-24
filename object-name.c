@@ -24,6 +24,7 @@
 #include "commit-reach.h"
 #include "date.h"
 #include "object-file-convert.h"
+#include "odb-over-ipc.h"
 
 static int get_oid_oneline(struct repository *r, const char *, struct object_id *, struct commit_list *);
 
@@ -1081,18 +1082,22 @@ static int get_oid_basic(struct repository *r, const char *str, int len,
 	return 0;
 }
 
-static enum get_oid_result get_parent(struct repository *r,
-				      const char *name, int len,
-				      struct object_id *result, int idx)
+enum get_oid_result get_parent(struct repository *r,
+			       const char *name, int len,
+			       struct object_id *result, int idx)
 {
 	struct object_id oid;
-	enum get_oid_result ret = get_oid_1(r, name, len, &oid,
-					    GET_OID_COMMITTISH);
+	enum get_oid_result ret;
 	struct commit *commit;
 	struct commit_list *p;
 
+	if (odb_over_ipc__get_parent(r, name, len, idx, result) == 0)
+		return FOUND;
+
+	ret = get_oid_1(r, name, len, &oid, GET_OID_COMMITTISH);
 	if (ret)
 		return ret;
+
 	commit = lookup_commit_reference(r, &oid);
 	if (repo_parse_commit(r, commit))
 		return MISSING_OBJECT;
@@ -1111,14 +1116,17 @@ static enum get_oid_result get_parent(struct repository *r,
 	return MISSING_OBJECT;
 }
 
-static enum get_oid_result get_nth_ancestor(struct repository *r,
-					    const char *name, int len,
-					    struct object_id *result,
-					    int generation)
+enum get_oid_result get_nth_ancestor(struct repository *r,
+				     const char *name, int len,
+				     struct object_id *result,
+				     int generation)
 {
 	struct object_id oid;
 	struct commit *commit;
 	int ret;
+
+	if (odb_over_ipc__get_ancestor(r, name, len, generation, result) == 0)
+		return FOUND;
 
 	ret = get_oid_1(r, name, len, &oid, GET_OID_COMMITTISH);
 	if (ret)

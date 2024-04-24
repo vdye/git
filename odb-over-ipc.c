@@ -264,4 +264,99 @@ int odb_over_ipc__hash_object(struct repository *r, struct object_id *oid,
 	return ret;
 }
 
+int odb_over_ipc__get_parent(struct repository *r, const char *name, int len,
+			     int idx, struct object_id *result)
+{
+	struct odb_over_ipc__get_parent__request req;
+	struct odb_over_ipc__get_parent__response *resp;
+	struct strbuf msg = STRBUF_INIT;
+	struct strbuf answer = STRBUF_INIT;
+	int ret;
+
+	if (is_daemon)
+		return -1;
+
+	if (!core_use_odb_over_ipc)
+		return -1;
+
+	if (r != the_repository)	// TODO not dealing with this
+		return -1;
+
+	memset(&req, 0, sizeof(req));
+	memcpy(req.key.key, "get-parent", 10);
+	req.idx = idx;
+	req.name_len = len;
+
+	/* Append the name at the end of the request */
+	strbuf_init(&msg, sizeof(req) + len);
+	strbuf_add(&msg, &req, sizeof(req));
+	strbuf_add(&msg, name, len);
+
+	ret = odb_over_ipc__command((const char *)msg.buf, msg.len, &answer);
+	if (ret)
+		return ret;
+
+	if (!strncmp(answer.buf, "error", 5)) {
+		trace2_printf("odb-over-ipc: failed");
+		return -1;
+	}
+
+	if (answer.len != sizeof(*resp))
+		BUG("incorrect size for binary data");
+	resp = (struct odb_over_ipc__get_parent__response *)answer.buf;
+
+	oidcpy(result, &resp->oid);
+
+	strbuf_release(&answer);
+	return ret;
+}
+
+int odb_over_ipc__get_ancestor(struct repository *r, const char *name,
+			       int len, int generation,
+			       struct object_id *result)
+{
+	struct odb_over_ipc__get_ancestor__request req;
+	struct odb_over_ipc__get_ancestor__response *resp;
+	struct strbuf msg = STRBUF_INIT;
+	struct strbuf answer = STRBUF_INIT;
+	int ret;
+
+	if (is_daemon)
+		return -1;
+
+	if (!core_use_odb_over_ipc)
+		return -1;
+
+	if (r != the_repository)	// TODO not dealing with this
+		return -1;
+
+	memset(&req, 0, sizeof(req));
+	memcpy(req.key.key, "get-ancestor", 12);
+	req.generation = generation;
+	req.name_len = len;
+
+	/* Append the name at the end of the request */
+	strbuf_init(&msg, sizeof(req) + len);
+	strbuf_add(&msg, &req, sizeof(req));
+	strbuf_add(&msg, name, len);
+
+	ret = odb_over_ipc__command((const char *)msg.buf, msg.len, &answer);
+	if (ret)
+		return ret;
+
+	if (!strncmp(answer.buf, "error", 5)) {
+		trace2_printf("odb-over-ipc: failed");
+		return -1;
+	}
+
+	if (answer.len != sizeof(*resp))
+		BUG("incorrect size for binary data");
+	resp = (struct odb_over_ipc__get_ancestor__response *)answer.buf;
+
+	oidcpy(result, &resp->oid);
+
+	strbuf_release(&answer);
+	return ret;
+}
+
 #endif /* SUPPORTS_SIMPLE_IPC */
