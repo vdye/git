@@ -1116,10 +1116,10 @@ enum get_oid_result get_parent(struct repository *r,
 	return MISSING_OBJECT;
 }
 
-static enum get_oid_result get_nth_ancestor(struct repository *r,
-					    const char *name, int len,
-					    struct object_id *result,
-					    int generation)
+enum get_oid_result get_nth_ancestor(struct repository *r,
+				     const char *name, int len,
+				     struct object_id *result,
+				     int generation)
 {
 	struct object_id oid;
 	struct commit *commit;

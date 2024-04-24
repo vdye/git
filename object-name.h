@@ -125,6 +125,11 @@ enum get_oid_result get_parent(struct repository *r,
 			       const char *name, int len,
 			       struct object_id *result, int idx);
 
+enum get_oid_result get_nth_ancestor(struct repository *r,
+				     const char *name, int len,
+				     struct object_id *result,
+				     int generation);
+
 /* Convert to/from hex/sha1 representation */
 #define MINIMUM_ABBREV minimum_abbrev
 #define DEFAULT_ABBREV default_abbrev
