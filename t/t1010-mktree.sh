@@ -71,17 +71,13 @@ test_expect_success 'allow missing object with --missing' '
 '
 
 test_expect_success 'mktree with invalid submodule OIDs' '
-	# non-existent OID - ok
-	printf "160000 commit $(test_oid numeric)\tA\n" >in &&
-	git mktree <in >tree.actual &&
-	git ls-tree $(cat tree.actual) >actual &&
-	test_cmp in actual &&
-
-	# existing OID, wrong type - error
-	tree_oid="$(cat tree)" &&
-	printf "160000 commit $tree_oid\tA" |
-	test_must_fail git mktree 2>err &&
-	test_grep "object $tree_oid is a tree but specified type was (commit)" err
+	for oid in "$(test_oid numeric)" "$(cat tree)"
+	do
+		printf "160000 commit $oid\tA\n" >in &&
+		git mktree <in >tree.actual &&
+		git ls-tree $(cat tree.actual) >actual &&
+		test_cmp in actual || return 1
+	done
 '
 
 test_expect_success 'mktree refuses to read ls-tree -r output (1)' '

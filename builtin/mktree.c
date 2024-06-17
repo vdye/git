@@ -107,8 +107,6 @@ static int mktree_line(unsigned int mode, struct object_id *oid,
 {
 	struct mktree_line_data *data = cbdata;
 	enum object_type mode_type = object_type(mode);
-	struct object_info oi = OBJECT_INFO_INIT;
-	enum object_type parsed_obj_type;
 
 	if (stage)
 		die(_("path '%s' is unmerged"), path);
@@ -117,36 +115,34 @@ static int mktree_line(unsigned int mode, struct object_id *oid,
 		die("object type (%s) doesn't match mode type (%s)",
 		    type_name(obj_type), type_name(mode_type));
 
-	oi.typep = &parsed_obj_type;
-
-	if (oid_object_info_extended(the_repository, oid, &oi,
-				     OBJECT_INFO_LOOKUP_REPLACE |
+	if (!S_ISGITLINK(mode)) {
+		struct object_info oi = OBJECT_INFO_INIT;
+		enum object_type parsed_obj_type;
+		unsigned int flags = OBJECT_INFO_LOOKUP_REPLACE |
 				     OBJECT_INFO_QUICK |
-				     OBJECT_INFO_SKIP_FETCH_OBJECT) < 0)
-		parsed_obj_type = -1;
+				     OBJECT_INFO_SKIP_FETCH_OBJECT;
 
-	if (parsed_obj_type < 0) {
-		/*
-		 * There are two conditions where the object being missing
-		 * is acceptable:
-		 *
-		 * - We're explicitly allowing it with --missing.
-		 * - The object is a submodule, which we wouldn't expect to
-		 *   be in this repo anyway.
-		 *
-		 * If neither condition is met, die().
-		 */
-		if (!data->allow_missing && !S_ISGITLINK(mode))
-			die("entry '%s' object %s is unavailable", path, oid_to_hex(oid));
+		oi.typep = &parsed_obj_type;
 
-	} else if (parsed_obj_type != mode_type) {
-		/*
-		 * The object exists but is of the wrong type.
-		 * This is a problem regardless of allow_missing
-		 * because the new tree entry will never be correct.
-		 */
-		die("entry '%s' object %s is a %s but specified type was (%s)",
-		    path, oid_to_hex(oid), type_name(parsed_obj_type), type_name(mode_type));
+		if (oid_object_info_extended(the_repository, oid, &oi, flags) < 0) {
+			/*
+			 * If the object is missing and we aren't explicitly
+			 * allowing missing objects, die(). Otherwise, continue
+			 * without error.
+			 */
+			if (!data->allow_missing)
+				die("entry '%s' object %s is unavailable", path,
+				    oid_to_hex(oid));
+		} else if (parsed_obj_type != mode_type) {
+			/*
+			 * The object exists but is of the wrong type.
+			 * This is a problem regardless of allow_missing
+			 * because the new tree entry will never be correct.
+			 */
+			die("entry '%s' object %s is a %s but specified type was (%s)",
+			    path, oid_to_hex(oid), type_name(parsed_obj_type),
+			    type_name(mode_type));
+		}
 	}
 
 	append_to_tree(mode, oid, path, data->arr);
