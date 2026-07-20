@@ -82,6 +82,32 @@ struct odb_over_ipc__hash_object__response
 	struct object_id oid;
 };
 
+struct odb_over_ipc__get_parent__request
+{
+	struct odb_over_ipc__key key;
+	int idx;
+	int name_len;
+};
+
+struct odb_over_ipc__get_parent__response
+{
+	struct odb_over_ipc__key key;
+	struct object_id oid;
+};
+
+struct odb_over_ipc__get_ancestor__request
+{
+	struct odb_over_ipc__key key;
+	int generation;
+	int name_len;
+};
+
+struct odb_over_ipc__get_ancestor__response
+{
+	struct odb_over_ipc__key key;
+	struct object_id oid;
+};
+
 /*
  * Connect to an existing `git odb--daemon` process and ask it for
  * an object.  This is intended to be inserted into the client
@@ -99,6 +125,13 @@ int odb_over_ipc__get_oid(struct repository *r, const struct object_id *oid,
 
 int odb_over_ipc__hash_object(struct repository *r, struct object_id *oid,
 			      int fd, enum object_type type, unsigned flags);
+
+int odb_over_ipc__get_parent(struct repository *r, const char *name, int len,
+			     int idx, struct object_id *result);
+
+int odb_over_ipc__get_ancestor(struct repository *r, const char *name,
+			       int len, int generation,
+			       struct object_id *result);
 
 /*
  * Explicitly shutdown IPC connection to the `git odb--daemon` process.
